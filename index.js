@@ -7,20 +7,20 @@ app.use(cors());
 app.use(express.json());
 
 // ==========================================
-// MAGIC WRAPPER: പഴയ കോഡുകൾ മാറ്റാതെ തന്നെ പുതിയ ലൈബ്രറി വർക്ക് ചെയ്യാൻ
+// MAGIC WRAPPER: _sync എററുകൾ പരിഹരിച്ച പുതിയ കോഡ്
 // ==========================================
 const Constants = swisseph;
 const eph = {
     swe_julday: (year, month, day, hour, cal) => swisseph.swe_julday(year, month, day, hour, cal),
     swe_set_sid_mode: (mode, t0, ayan_t0) => swisseph.swe_set_sid_mode(mode, t0, ayan_t0),
-    swe_get_ayanamsa_ut: (jd) => swisseph.swe_get_ayanamsa_ut_sync(jd),
+    swe_get_ayanamsa_ut: (jd) => swisseph.swe_get_ayanamsa_ut(jd),
     swe_calc_ut: (jd, body, flags) => {
-        const res = swisseph.swe_calc_ut_sync(jd, body, flags);
+        const res = swisseph.swe_calc_ut(jd, body, flags);
         return { xx: [res.longitude, res.latitude, res.distance, res.speedInLong, res.speedInLat, res.speedInDist] };
     },
     swe_houses: (jd, lat, lon, system) => {
         const sysChar = typeof system === 'number' ? String.fromCharCode(system) : system;
-        const res = swisseph.swe_houses_sync(jd, lat, lon, sysChar);
+        const res = swisseph.swe_houses(jd, lat, lon, sysChar);
         return { ascendant: res.ascendant };
     }
 };
@@ -563,7 +563,10 @@ app.post('/daily-horoscope', async (req, res) => {
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
         const natalAyanamsa = eph.swe_get_ayanamsa_ut(natalJd);
 
-        const getPos = (jd, id, ayanamsa) => (eph.swe_calc_ut(jd, id, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
+        const getPos = (jd, id, ayanamsa) => {
+            const res = swisseph.swe_calc_ut(jd, id, Constants.SEFLG_SWIEPH);
+            return (res.longitude - ayanamsa + 360) % 360;
+        };
 
         let natalMoonDeg = getPos(natalJd, Constants.SE_MOON, natalAyanamsa);
         let natalSunDeg = getPos(natalJd, Constants.SE_SUN, natalAyanamsa);
@@ -608,7 +611,7 @@ app.post('/premium-alerts', async (req, res) => {
         const natalJd = eph.swe_julday(year, month, day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
         const natalAyanamsa = eph.swe_get_ayanamsa_ut(natalJd);
-        let natalMoonDeg = (eph.swe_calc_ut(natalJd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - natalAyanamsa + 360) % 360;
+        let natalMoonDeg = (swisseph.swe_calc_ut(natalJd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).longitude - natalAyanamsa + 360) % 360;
         let natalRasi = Math.floor(natalMoonDeg / 30) + 1;
 
         const tomorrow = new Date(); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
@@ -619,8 +622,8 @@ app.post('/premium-alerts', async (req, res) => {
         const tAyanamsa = eph.swe_get_ayanamsa_ut(tmrwJd);
 
         const checkTransit = (planetId, planetName) => {
-            let degToday = (eph.swe_calc_ut(todayJd, planetId, Constants.SEFLG_SWIEPH).xx[0] - tAyanamsa + 360) % 360;
-            let degTmrw = (eph.swe_calc_ut(tmrwJd, planetId, Constants.SEFLG_SWIEPH).xx[0] - tAyanamsa + 360) % 360;
+            let degToday = (swisseph.swe_calc_ut(todayJd, planetId, Constants.SEFLG_SWIEPH).longitude - tAyanamsa + 360) % 360;
+            let degTmrw = (swisseph.swe_calc_ut(tmrwJd, planetId, Constants.SEFLG_SWIEPH).longitude - tAyanamsa + 360) % 360;
             let signToday = Math.floor(degToday / 30) + 1, signTmrw = Math.floor(degTmrw / 30) + 1;
             
             if (signToday !== signTmrw) {
@@ -682,9 +685,9 @@ app.post('/monthly-calendar', async (req, res) => {
             eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
             let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
 
-            let sunDeg = (eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
-            let moonDeg = (eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
-            let sunDegPrev = (eph.swe_calc_ut(jd - 1, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
+            let sunDeg = (swisseph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).longitude - ayanamsa + 360) % 360;
+            let moonDeg = (swisseph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).longitude - ayanamsa + 360) % 360;
+            let sunDegPrev = (swisseph.swe_calc_ut(jd - 1, Constants.SE_SUN, Constants.SEFLG_SWIEPH).longitude - ayanamsa + 360) % 360;
 
             let sunRasi = Math.floor(sunDeg / 30), sunRasiPrev = Math.floor(sunDegPrev / 30);
             let isSankranti = false;
