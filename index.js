@@ -1,15 +1,21 @@
 const express = require('express');
 const cors = require('cors');
-const { load, Constants } = require('@fusionstrings/swiss-eph');
+// ലൈബ്രറി മുകളിൽ നിന്നും ഒഴിവാക്കി (താഴെ ഡൈനാമിക് ആയി ലോഡ് ചെയ്യുന്നു)
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// സെർവർ വർക്ക് ചെയ്യുന്നുണ്ടോ എന്ന് പരിശോധിക്കാനുള്ള വഴി
 app.get('/', (req, res) => {
     res.send("Prarthi Astrology Backend is Running Perfectly on Node.js!");
 });
+
+// ലൈബ്രറി സുരക്ഷിതമായി ലോഡ് ചെയ്യാനുള്ള ഹെൽപ്പർ ഫംഗ്ഷൻ (Error Fix)
+async function getEph() {
+    const { load, Constants } = await import('@fusionstrings/swiss-eph');
+    const eph = await load();
+    return { eph, Constants };
+}
 
 // ==========================================
 // 1. ജാതകം ഗണിക്കുന്ന ഭാഗം (Horoscope API)
@@ -19,7 +25,7 @@ app.post('/generate-horoscope', async (req, res) => {
         const body = req.body;
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
@@ -58,7 +64,7 @@ app.post('/get-panchangam', async (req, res) => {
         const body = req.body;
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
         
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
         const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
@@ -89,7 +95,7 @@ app.post('/get-panchangam', async (req, res) => {
 app.post('/calculate-porutham', async (req, res) => {
     try {
         const body = req.body;
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
         const getAstroDetails = (person) => {
@@ -121,7 +127,7 @@ app.post('/calculate-dosha', async (req, res) => {
         const body = req.body;
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
         const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
@@ -208,7 +214,7 @@ app.post('/calculate-muhurtha', async (req, res) => {
         const body = req.body;
         let lat = body.lat || 9.9312, lon = body.lon || 76.2673;
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         let jd = eph.swe_julday(body.year, body.month, body.day, 6.5, Constants.SE_GREG_CAL);
         let sunPos = eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH);
         let sunLon = sunPos.xx[0]; 
@@ -288,7 +294,7 @@ app.post('/calculate-dasha', async (req, res) => {
         const body = req.body;
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
         const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
@@ -342,7 +348,7 @@ app.post('/calculate-vargas', async (req, res) => {
         const body = req.body;
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
         const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
@@ -411,7 +417,7 @@ app.post('/calculate-kp-ashtakavarga', async (req, res) => {
         const body = req.body;
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0); 
         const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
@@ -487,7 +493,6 @@ app.post('/calculate-kp-ashtakavarga', async (req, res) => {
 // 9. AI Astrologer (Render ൽ Cloudflare AI ലഭ്യമല്ല)
 // ==========================================
 app.post('/ai-astrologer', async (req, res) => {
-    // ഭാവിയിൽ ഇതിൽ OpenAI (ChatGPT) API കീ ഉപയോഗിച്ച് ഫീച്ചർ ചേർക്കാം
     res.json({
         success: false,
         answer: "Cloudflare AI ഈ പ്ലാറ്റ്‌ഫോമിൽ ലഭ്യമല്ല. ഇതിന് പകരം ഭാവിയിൽ OpenAI ഉപയോഗിക്കാവുന്നതാണ്."
@@ -552,7 +557,7 @@ app.post('/daily-horoscope', async (req, res) => {
         const currentYear = now.getUTCFullYear(), currentMonth = now.getUTCMonth() + 1;
         const currentDay = now.getUTCDate(), currentHour = now.getUTCHours() + (now.getUTCMinutes() / 60.0);
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         let floatHour = hour + (min / 60.0) - 5.5;
         const natalJd = eph.swe_julday(year, month, day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
@@ -598,7 +603,7 @@ app.post('/premium-alerts', async (req, res) => {
         const body = req.body;
         const { year, month, day, hour, min, lat, lon } = body;
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         let floatHour = hour + (min / 60.0) - 5.5;
         const natalJd = eph.swe_julday(year, month, day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
@@ -655,7 +660,7 @@ app.post('/monthly-calendar', async (req, res) => {
         const body = req.body;
         const { year, month, lat, lon } = body; 
 
-        const eph = await load();
+        const { eph, Constants } = await getEph();
         const daysInMonth = new Date(year, month, 0).getDate();
         let calendarData = [];
 
