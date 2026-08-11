@@ -1,6 +1,6 @@
-const express = require('express');
-const cors = require('cors');
-// ലൈബ്രറി മുകളിൽ നിന്നും ഒഴിവാക്കി (താഴെ ഡൈനാമിക് ആയി ലോഡ് ചെയ്യുന്നു)
+import express from 'express';
+import cors from 'cors';
+import { load, Constants } from '@fusionstrings/swiss-eph';
 
 const app = express();
 app.use(cors());
