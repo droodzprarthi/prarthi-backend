@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { load, Constants } from '@fusionstrings/swiss-eph';
+import { load, Constants } from '@fusionstrings/swisseph-wasm';
 
 const app = express();
 app.use(cors());
