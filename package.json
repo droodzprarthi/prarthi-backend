@@ -3,13 +3,12 @@
   "version": "1.0.0",
   "description": "Astrology Backend",
   "main": "index.js",
-  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "express": "^4.19.2",
     "cors": "^2.8.5",
-    "@fusionstrings/swisseph-wasm": "latest"
+    "swisseph": "^3.0.4"
   }
 }
