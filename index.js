@@ -104,8 +104,7 @@ app.post('/get-panchangam', async (req, res) => {
 });
 
 // ==========================================
-// 3. പൊരുത്തം നോക്കാനുള്ള ഭാഗം (Ultimate Marriage Matching API)
-// (പാപസാമ്യം, ദശവിധ പൊരുത്തം, അഷ്ടകൂട മിലാൻ, 20 പൊരുത്തങ്ങൾ, ദശാസന്ധി)
+// 3. പൊരുത്തം നോക്കാനുള്ള ഭാഗം (Marriage Matching API)
 // ==========================================
 app.post('/calculate-porutham', async (req, res) => {
     try {
@@ -113,19 +112,16 @@ app.post('/calculate-porutham', async (req, res) => {
         const eph = await load();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
-        // ഗ്രഹങ്ങളുടെയും ഭാവങ്ങളുടെയും ദൂരം കണ്ടുപിടിക്കാനുള്ള ഫംഗ്ഷൻ
         const getHouseDiff = (start, target) => (target - start + 12) % 12 + 1;
 
-        // നക്ഷത്രങ്ങളുടെ അടിസ്ഥാന വിവരങ്ങൾ (0: അശ്വതി മുതൽ 26: രേവതി വരെ)
-        const ganas = [1, 2, 3, 2, 3, 1, 1, 1, 3, 3, 2, 2, 2, 3, 1, 2, 2, 3, 3, 2, 2, 1, 3, 3, 2, 2, 1]; // 1:Deva, 2:Manushya, 3:Rakshasa
-        const nadis = [1, 2, 3, 3, 2, 1, 1, 2, 3, 3, 2, 1, 1, 2, 3, 3, 2, 1, 1, 2, 3, 3, 2, 1, 1, 2, 3]; // 1:Adi, 2:Madhya, 3:Antya
-        const yonis = [1, 2, 3, 4, 4, 5, 6, 3, 6, 7, 7, 8, 9, 10, 9, 10, 11, 11, 5, 12, 13, 12, 14, 1, 14, 8, 2]; // 14 Animals
-        const hostileYonis = { 1:9, 9:1, 2:14, 14:2, 3:12, 12:3, 4:13, 13:4, 5:11, 11:5, 6:7, 7:6, 8:10, 10:8 }; // ശത്രു മൃഗങ്ങൾ
-        const rajjus = [1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 5, 4]; // 1:Padam, 2:Kati, 3:Nabhi, 4:Kandam, 5:Siras
+        const ganas = [1, 2, 3, 2, 3, 1, 1, 1, 3, 3, 2, 2, 2, 3, 1, 2, 2, 3, 3, 2, 2, 1, 3, 3, 2, 2, 1]; 
+        const nadis = [1, 2, 3, 3, 2, 1, 1, 2, 3, 3, 2, 1, 1, 2, 3, 3, 2, 1, 1, 2, 3, 3, 2, 1, 1, 2, 3]; 
+        const yonis = [1, 2, 3, 4, 4, 5, 6, 3, 6, 7, 7, 8, 9, 10, 9, 10, 11, 11, 5, 12, 13, 12, 14, 1, 14, 8, 2]; 
+        const hostileYonis = { 1:9, 9:1, 2:14, 14:2, 3:12, 12:3, 4:13, 13:4, 5:11, 11:5, 6:7, 7:6, 8:10, 10:8 }; 
+        const rajjus = [1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 5, 4]; 
         const vrukshas = ["Nuxvomica", "Emblic Myrobalan", "Cluster Fig", "Rose Apple", "Cutch Tree", "Ebony", "Bamboo", "Peepal", "Mesua", "Banyan", "Flame of the Forest", "Fig", "Jasmine", "Pine", "Coral Tree", "Wood Apple", "Bullet Wood", "Pine", "Sal Tree", "Cane", "Jackfruit", "Crown Flower", "Vanni", "Kadamba", "Neem", "Mango", "Madhuca"];
-        const pakshis = ["Falcon", "Owl", "Crow", "Cock", "Peacock"]; // 5 പക്ഷികൾ ആവർത്തിക്കുന്നു
+        const pakshis = ["Falcon", "Owl", "Crow", "Cock", "Peacock"]; 
 
-        // ഒരു വ്യക്തിയുടെ സമ്പൂർണ്ണ ജാതക വിവരങ്ങൾ ഗണിക്കാനുള്ള ഫംഗ്ഷൻ
         const getFullAstroDetails = (person) => {
             let floatHour = person.hour + (person.min / 60.0) - 5.5; 
             const jd = eph.swe_julday(person.year, person.month, person.day, floatHour, Constants.SE_GREG_CAL);
@@ -147,31 +143,28 @@ app.post('/calculate-porutham', async (req, res) => {
             let nakshatraIndex = Math.floor(moonDeg / (360 / 27));
             let pada = Math.floor((moonDeg % (360 / 27)) / (360 / 108)) + 1;
             
-            // പാപസാമ്യം കാൽക്കുലേഷൻ (Papasamyam Calculation)
             let papaPoints = 0;
             const papaHouses = [1, 2, 4, 7, 8, 12];
-            const basePoints = { 8: 3, 7: 2, 1: 1, 2: 1, 4: 1, 12: 1 }; // 8-ാം ഭാവത്തിന് ഏറ്റവും കൂടുതൽ ദോഷം
+            const basePoints = { 8: 3, 7: 2, 1: 1, 2: 1, 4: 1, 12: 1 };
             const maleficPlanets = ["Mars", "Sun", "Saturn", "Rahu", "Ketu"];
-            const referencePoints = ["Ascendant", "Moon", "Venus"]; // ലഗ്നം, ചന്ദ്രൻ, ശുക്രൻ എന്നിവയിൽ നിന്ന് നോക്കുന്നു
+            const referencePoints = ["Ascendant", "Moon", "Venus"]; 
 
             referencePoints.forEach(ref => {
                 maleficPlanets.forEach(malefic => {
                     let diff = getHouseDiff(planets[ref], planets[malefic]);
                     if (papaHouses.includes(diff)) {
-                        let multiplier = (malefic === "Mars") ? 1.0 : 0.75; // ചൊവ്വയ്ക്ക് പൂർണ്ണ ദോഷം, മറ്റുള്ളവയ്ക്ക് മുക്കാൽ ഭാഗം
+                        let multiplier = (malefic === "Mars") ? 1.0 : 0.75; 
                         papaPoints += (basePoints[diff] * multiplier);
                     }
                 });
             });
 
-            // ദശാസന്ധി കാൽക്കുലേഷൻ (Dasa Balance)
             let degreesPassed = moonDeg % (360 / 27);
             let fractionRemaining = 1.0 - (degreesPassed / (360 / 27));
             const dashaYears = [7, 20, 6, 10, 7, 18, 16, 19, 17];
             let startDashaIndex = nakshatraIndex % 9;
             let balanceYears = fractionRemaining * dashaYears[startDashaIndex];
             
-            // ചൊവ്വാ ദോഷം (Kuja Dosham) & സർപ്പ ദോഷം
             let marsFromAsc = getHouseDiff(planets.Ascendant, planets.Mars);
             let isManglik = [1, 2, 4, 7, 8, 12].includes(marsFromAsc);
             let hasSarpaDosham = [1, 2, 7, 8].includes(getHouseDiff(planets.Ascendant, planets.Rahu));
@@ -187,66 +180,46 @@ app.post('/calculate-porutham', async (req, res) => {
         let boy = getFullAstroDetails(body.boy);
         let girl = getFullAstroDetails(body.girl);
 
-        // ===================================================
-        // 1. കേരളീയ ദശവിധ പൊരുത്തങ്ങൾ (Kerala 10 Poruthams) & തമിഴ് 20 പൊരുത്തങ്ങൾ
-        // ===================================================
         let nakshatraDistance = (boy.nakshatra_index - girl.nakshatra_index + 27) % 27 + 1;
         let rasiDistance = (boy.rasi_index - girl.rasi_index + 12) % 12 + 1;
 
-        // 1. ദിനപ്പൊരുത്തം
         let dinam = [2, 4, 6, 8, 9, 11, 13, 15, 18, 20, 24, 26].includes(nakshatraDistance) ? "Good" : "Bad";
-        // 2. ഗണപ്പൊരുത്തം
         let ganam = (boy.attributes.gana === girl.attributes.gana) ? "Good" : ((girl.attributes.gana === 1 && boy.attributes.gana === 2) ? "Average" : "Bad");
-        // 3. യോനിപ്പൊരുത്തം (ശത്രു മൃഗങ്ങൾ അല്ലെന്ന് ഉറപ്പാക്കുന്നു)
         let yoni = (hostileYonis[boy.attributes.yoni] === girl.attributes.yoni) ? "Bad" : "Good";
-        // 4. രാശിപ്പൊരുത്തം (6-8, 2-12 പാടില്ല)
         let rasi = [1, 3, 4, 5, 7, 9, 10, 11].includes(rasiDistance) ? "Good" : "Bad";
-        // 5. രജ്ജുപ്പൊരുത്തം (ഒരേ രജ്ജു പാടില്ല - ജീവാപായം)
         let rajju = (boy.attributes.rajju !== girl.attributes.rajju) ? "Good" : "Bad";
-        // 6. നാഡിപ്പൊരുത്തം (തമിഴ്നാട്/ആന്ധ്ര സ്പെഷ്യൽ - ഒരേ നാഡി പാടില്ല)
         let nadi = (boy.attributes.nadi !== girl.attributes.nadi) ? "Good" : "Bad";
-        // 7. സ്ത്രീദീർഘപ്പൊരുത്തം
         let streeDheergham = (nakshatraDistance > 15) ? "Good" : ((nakshatraDistance > 7) ? "Average" : "Bad");
-        // 8. മാഹേന്ദ്രപ്പൊരുത്തം
         let mahendram = [4, 7, 10, 13, 16, 19, 22, 25].includes(nakshatraDistance) ? "Good" : "Bad";
-        // 9. വൃക്ഷപ്പൊരുത്തം & 10. പക്ഷിക്കൊരുത്തം (20 പൊരുത്തങ്ങളിൽ പെട്ടത്)
         let vruksham = (boy.attributes.vruksha === girl.attributes.vruksha) ? "Good" : "Average";
         let pakshi = (boy.attributes.pakshi === girl.attributes.pakshi) ? "Good" : "Average";
 
         let tenPoruthamScore = [dinam, ganam, yoni, rasi, rajju, streeDheergham, mahendram].filter(p => p === "Good").length;
 
-        // ===================================================
-        // 2. ഉത്തരേന്ത്യൻ അഷ്ടകൂട മിലാൻ (North Indian 36 Points)
-        // ===================================================
         let ashtakoota = {
             varna: (girl.rasi_index <= boy.rasi_index) ? 1 : 0,
-            vasya: 2, // Simplified for code limit
+            vasya: 2, 
             tara: (nakshatraDistance % 9 !== 3 && nakshatraDistance % 9 !== 5 && nakshatraDistance % 9 !== 7) ? 3 : 1.5,
             yoni: (yoni === "Good") ? 4 : 1,
-            grahaMaitri: 5, // Simplified
+            grahaMaitri: 5, 
             gana: (ganam === "Good") ? 6 : (ganam === "Average" ? 3 : 0),
             bhakoota: (rasi === "Good") ? 7 : 0,
             nadi: (nadi === "Good") ? 8 : 0
         };
         let totalAshtakoota = Object.values(ashtakoota).reduce((a, b) => a + b, 0);
 
-        // ===================================================
-        // 3. ദശാസന്ധി & പാപസാമ്യം (Dasa Sandhi & Papasamyam)
-        // ===================================================
         let dasaSandhiDifference = Math.abs(boy.balance_dasha_years - girl.balance_dasha_years);
-        let hasDasaSandhi = dasaSandhiDifference < 1.0; // 1 വർഷത്തിൽ താഴെ വ്യത്യാസമുണ്ടെങ്കിൽ ദശാസന്ധി ഉണ്ട്
+        let hasDasaSandhi = dasaSandhiDifference < 1.0; 
 
         let papasamyamMatch = "Average";
         let papaDiff = boy.papa_points - girl.papa_points;
-        if (papaDiff > 0 && papaDiff <= 15) papasamyamMatch = "Good"; // ആൺകുട്ടിക്ക് പാപം അല്പം കൂടുതൽ ആവാം
+        if (papaDiff > 0 && papaDiff <= 15) papasamyamMatch = "Good"; 
         else if (Math.abs(papaDiff) < 5) papasamyamMatch = "Good";
-        else papasamyamMatch = "Bad"; // പെൺകുട്ടിക്ക് പാപം വളരെ കൂടിയാൽ ദോഷം
+        else papasamyamMatch = "Bad"; 
 
-        // ദോഷ സാമ്യം
         let manglikMatch = (boy.is_manglik === girl.is_manglik);
         let sarpaDoshaMatch = (boy.has_sarpa_dosham === girl.has_sarpa_dosham);
 
-        // ഫൈനൽ JSON Response
         res.status(200).json({ 
             success: true, 
             kerala_10_porutham: { 
@@ -255,7 +228,7 @@ app.post('/calculate-porutham', async (req, res) => {
                 overall_status: tenPoruthamScore >= 6 ? "Recommended" : "Not Recommended"
             },
             tamil_20_porutham_extended: {
-                nadi_porutham: nadi, // തമിഴ്നാടിനും ആന്ധ്രയ്ക്കും വളരെ പ്രധാനം
+                nadi_porutham: nadi, 
                 vruksha_porutham: vruksham,
                 pakshi_porutham: pakshi
             },
@@ -869,6 +842,101 @@ app.post('/monthly-calendar', async (req, res) => {
             });
         }
         res.status(200).json({ success: true, month: month, year: year, calendar: calendarData });
+    } catch (e) {
+        res.status(500).json({ error: e.message, stack: e.stack });
+    }
+});
+
+// ==========================================
+// 13. SHASTRA OMENS (ഗൗളി, സ്വപ്നം, ശകുനം, തുമ്മൽ, കാക്ക)
+// ==========================================
+app.get('/get-shastra-omens', (req, res) => {
+    try {
+        const lang = req.query.lang || "ml";
+        
+        // Comprehensive Dictionary of Omens in Malayalam & English
+        const omensData = {
+            "gowli_shastra": {
+                "category_ml": "ഗൗളീശാസ്ത്രം (പല്ലി വീഴുന്ന ഫലം)",
+                "category_en": "Lizard Astrology (Gowli Shastra)",
+                "rules": [
+                    { "condition_ml": "പുരുഷന്റെ വലതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Man's Right Side", "result_ml": "ശുഭഫലം (Good Luck)", "result_en": "Auspicious (Good Luck)" },
+                    { "condition_ml": "പുരുഷന്റെ ഇടതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Man's Left Side", "result_ml": "അശുഭഫലം (Bad Luck)", "result_en": "Inauspicious (Bad Luck)" },
+                    { "condition_ml": "സ്ത്രീയുടെ ഇടതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Woman's Left Side", "result_ml": "ശുഭഫലം (Good Luck)", "result_en": "Auspicious (Good Luck)" },
+                    { "condition_ml": "സ്ത്രീയുടെ വലതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Woman's Right Side", "result_ml": "അശുഭഫലം (Bad Luck)", "result_en": "Inauspicious (Bad Luck)" },
+                    { "condition_ml": "തലയിൽ വീണാൽ (രണ്ടുപേർക്കും)", "condition_en": "Falls on Head", "result_ml": "കടുത്ത ദുഃഖം, കലഹം", "result_en": "Sorrow, Disputes" },
+                    { "condition_ml": "നെറ്റിയിൽ വീണാൽ", "condition_en": "Falls on Forehead", "result_ml": "സ്ഥാനമാനങ്ങൾ ലഭിക്കും", "result_en": "Honor & Promotions" },
+                    { "condition_ml": "പാദത്തിൽ വീണാൽ", "condition_en": "Falls on Feet", "result_ml": "യാത്രാക്ലേശം, യാത്രകൾ വേണ്ടിവരും", "result_en": "Travel, Tiredness" }
+                ],
+                "regional_info_ml": "കേരളത്തിൽ ഗാർഗ്യ സ്മൃതി പ്രകാരം പല്ലി ശരീരത്തിൽ വീഴുന്നതിനാണ് പ്രാധാന്യം. എന്നാൽ തമിഴ്‌നാട്ടിലും ആന്ധ്രയിലും പല്ലി ചിലയ്ക്കുന്ന (ശബ്ദമുണ്ടാക്കുന്ന) ദിശയും ദിവസവും നോക്കുന്ന 'ഗൗളി പഞ്ചാംഗം' രീതിയാണ് കൂടുതൽ പ്രചാരത്തിലുള്ളത്.",
+                "regional_info_en": "In Kerala, Gowli falling on the body is significant. In Tamil Nadu & Andhra, the direction and day of the Lizard's chirping are deeply analyzed (Gowli Panchangam)."
+            },
+            "swapna_shastra": {
+                "category_ml": "സ്വപ്ന ശാസ്ത്രം",
+                "category_en": "Dream Interpretations",
+                "rules": [
+                    { "condition_ml": "ആനയെ സ്വപ്നം കണ്ടാൽ", "condition_en": "Seeing an Elephant", "result_ml": "സമ്പത്ത്, ഐശ്വര്യം (കേരളത്തിൽ പൂർവ്വികരുടെ സാന്നിധ്യമായും കാണുന്നു)", "result_en": "Wealth & Prosperity (Ancestral presence in Kerala)" },
+                    { "condition_ml": "പാമ്പ് കടിക്കുന്നതായി കണ്ടാൽ", "condition_en": "Snake Biting", "result_ml": "ശത്രുനാശം, ധനലാഭം", "result_en": "Victory over enemies, Financial gain" },
+                    { "condition_ml": "പല്ല് കൊഴിയുന്നതായി കണ്ടാൽ", "condition_en": "Falling Teeth", "result_ml": "കുടുംബത്തിൽ രോഗം അല്ലെങ്കിൽ ദുഃഖം", "result_en": "Sickness or sorrow in the family" },
+                    { "condition_ml": "മരണമോ ശവമോ കണ്ടാൽ", "condition_en": "Seeing Death or Corpse", "result_ml": "ആയുർദൈർഘ്യം വർദ്ധിക്കും, രോഗമുക്തി", "result_en": "Long life, Recovery from illness" },
+                    { "condition_ml": "തീപിടുത്തം കണ്ടാൽ", "condition_en": "Seeing Fire", "result_ml": "സ്ഥാനക്കയറ്റം, പുതിയ ഉത്തരവാദിത്തങ്ങൾ", "result_en": "Promotions, New responsibilities" }
+                ],
+                "regional_info_ml": "സ്വപ്നം കാണുന്ന യാമം (സമയം) അനുസരിച്ച് ഫലസിദ്ധി വ്യത്യാസപ്പെടും. രാത്രി ആദ്യ യാമത്തിൽ കണ്ടാൽ 1 വർഷം കൊണ്ടും, പുലർച്ചെ (ബ്രാഹ്മമുഹൂർത്തത്തിൽ) കണ്ടാൽ അന്ന് തന്നെയോ ആഴ്ചകൾക്കുള്ളിലോ ഫലിക്കും.",
+                "regional_info_en": "Dreams seen in the early night take a year to manifest, while dreams seen in the early morning (Brahma Muhurta) manifest immediately."
+            },
+            "shakunam": {
+                "category_ml": "യാത്രാ ശകുനങ്ങൾ (നിമിത്തങ്ങൾ)",
+                "category_en": "Travel Omens & Signs",
+                "rules": [
+                    { "condition_ml": "മംഗല്യവതി, നിറകുടം, പശു എന്നിവയെ കാണുന്നത്", "condition_en": "Seeing Married Woman, Full Pot, Cow", "result_ml": "ഉത്തമ ശകുനം (കാര്യവിജയം)", "result_en": "Highly Auspicious (Success)" },
+                    { "condition_ml": "പൂച്ച കുറുകെ ചാടുന്നത്", "condition_en": "Cat crossing the path", "result_ml": "അശുഭം (യാത്ര അല്പനേരം മാറ്റിവെക്കുക)", "result_en": "Inauspicious (Delay the trip)" },
+                    { "condition_ml": "വിറക്, ഒഴിഞ്ഞ പാത്രം എന്നിവ കാണുന്നത്", "condition_en": "Seeing Firewood, Empty Pot", "result_ml": "തടസ്സങ്ങൾ", "result_en": "Obstacles" },
+                    { "condition_ml": "ഇരട്ട ബ്രാഹ്മണരെ കാണുന്നത്", "condition_en": "Seeing Twin Brahmins", "result_ml": "അത്യുത്തമം", "result_en": "Highly Auspicious" }
+                ],
+                "regional_info_ml": "ഉത്തരേന്ത്യൻ ശകുന ശാസ്ത്രത്തിൽ മൃഗങ്ങളുടെ നീക്കങ്ങൾക്കും (ഉദാഹരണത്തിന് യാത്ര പോകുമ്പോൾ പട്ടി ഇടത്തുനിന്നും വലത്തോട്ട് പോയാൽ ശുഭം) പ്രാധാന്യമുണ്ട്.",
+                "regional_info_en": "North Indian Shakun Shastra places high importance on the movement direction of animals crossing your path."
+            },
+            "anga_samudrika": {
+                "category_ml": "അംഗ സാമുദ്രികം (ശരീരം തുടിക്കുന്ന ഫലം)",
+                "category_en": "Anga Samudrika (Body Twitching)",
+                "rules": [
+                    { "condition_ml": "പുരുഷന്റെ വലതുകണ്ണ് തുടിച്ചാൽ", "condition_en": "Man's Right Eye Twitches", "result_ml": "ശുഭവാർത്ത, ഇഷ്ടജന സമാഗമം", "result_en": "Good news, Meeting loved ones" },
+                    { "condition_ml": "സ്ത്രീയുടെ ഇടതുകണ്ണ് തുടിച്ചാൽ", "condition_en": "Woman's Left Eye Twitches", "result_ml": "ശുഭവാർത്ത, സന്തോഷം", "result_en": "Good news, Happiness" },
+                    { "condition_ml": "വലത്തെ ഉള്ളംകൈ തരിച്ചാൽ", "condition_en": "Right Palm Itching", "result_ml": "ധനലാഭം", "result_en": "Financial Gain" },
+                    { "condition_ml": "ഇടത്തെ ഉള്ളംകൈ തരിച്ചാൽ", "condition_en": "Left Palm Itching", "result_ml": "ധനനഷ്ടം (സ്ത്രീകൾക്ക് ധനലാഭം)", "result_en": "Financial Loss (Gain for Women)" }
+                ],
+                "regional_info_ml": "മിക്കയിടത്തും വലതുഭാഗം പുരുഷന്മാർക്കും ഇടതുഭാഗം സ്ത്രീകൾക്കും ഭാഗ്യമായി കണക്കാക്കുന്നു.",
+                "regional_info_en": "Generally, right side twitching is lucky for men, and left side is lucky for women."
+            },
+            "kaka_thummal": {
+                "category_ml": "കാക്ക ശാസ്ത്രം & തുമ്മൽ ശാസ്ത്രം",
+                "category_en": "Crow Omens & Sneezing Omens",
+                "rules": [
+                    { "condition_ml": "യാത്ര പുറപ്പെടുമ്പോൾ ഒറ്റത്തവണ തുമ്മിയാൽ", "condition_en": "One Sneeze when leaving", "result_ml": "യാത്രാ തടസ്സം", "result_en": "Obstacle in travel" },
+                    { "condition_ml": "രണ്ടു തവണ തുടർച്ചയായി തുമ്മിയാൽ", "condition_en": "Two consecutive sneezes", "result_ml": "കാര്യവിജയം, ശുഭം", "result_en": "Success, Auspicious" },
+                    { "condition_ml": "വീടിനു മുന്നിൽ കാക്ക കരഞ്ഞാൽ", "condition_en": "Crow cawing in front of house", "result_ml": "അതിഥികൾ വരും", "result_en": "Guests will arrive" },
+                    { "condition_ml": "യാത്രയിൽ കാക്ക വലത്തുനിന്നും ഇടത്തോട്ട് പറന്നാൽ", "condition_en": "Crow flies Right to Left during travel", "result_ml": "ലാഭം, വിജയം", "result_en": "Profit, Victory" }
+                ],
+                "regional_info_ml": "തമിഴ്‌നാട്ടിൽ കാക്ക കരയുന്ന ദിശ നോക്കി ശകുനം പറയുന്ന 'കാക്ക ശാസ്ത്രം' വളരെ പ്രശസ്തമാണ്.",
+                "regional_info_en": "In Tamil Nadu, 'Kaka Shastra' (analyzing crow sounds and directions) is a highly respected tradition."
+            }
+        };
+
+        // ഭാഷയ്ക്ക് അനുസരിച്ച് ഡാറ്റ ഫിൽറ്റർ ചെയ്യുന്നു
+        const formattedData = Object.keys(omensData).map(key => {
+            const shastra = omensData[key];
+            return {
+                id: key,
+                category: lang === 'en' ? shastra.category_en : shastra.category_ml,
+                regional_info: lang === 'en' ? shastra.regional_info_en : shastra.regional_info_ml,
+                rules: shastra.rules.map(r => ({
+                    condition: lang === 'en' ? r.condition_en : r.condition_ml,
+                    result: lang === 'en' ? r.result_en : r.result_ml
+                }))
+            };
+        });
+
+        res.status(200).json({ success: true, shastras: formattedData });
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
