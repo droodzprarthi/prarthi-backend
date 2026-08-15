@@ -260,6 +260,9 @@ app.post('/calculate-porutham', async (req, res) => {
 // ==========================================
 // 4. സമ്പൂർണ്ണ ദോഷ നിർണ്ണയം
 // ==========================================
+// ==========================================
+// 4. സമ്പൂർണ്ണ ദോഷ നിർണ്ണയം (Manglik Dosha Fixed)
+// ==========================================
 app.post('/calculate-dosha', async (req, res) => {
     try {
         const body = req.body;
@@ -296,8 +299,12 @@ app.post('/calculate-dosha', async (req, res) => {
         
         let marsFromAsc = getHouseDifference(ascRasi, marsRasi), marsFromMoon = getHouseDifference(moonRasi, marsRasi);
         const manglikHouses = [1, 2, 4, 7, 8, 12];
-        let isManglikAsc = manglikHouses.includes(marsFromAsc), isManglikMoon = manglikHouses.includes(marsFromMoon);
-        let hasManglikDosha = isManglikAsc || isManglikMoon;
+        
+        // 🌟 ഫിക്സ് 5: ചൊവ്വാദോഷത്തിന് പ്രധാനപ്പെട്ട Exception നൽകി (സ്വക്ഷേത്രം & ഉച്ചം) 🌟
+        let isMarsStrong = [1, 8, 10].includes(marsRasi); // 1-മേടം, 8-വൃശ്ചികം, 10-മകരം
+        let isManglikAsc = manglikHouses.includes(marsFromAsc);
+        let isManglikMoon = manglikHouses.includes(marsFromMoon);
+        let hasManglikDosha = (isManglikAsc || isManglikMoon) && !isMarsStrong;
 
         let minRK = Math.min(planets.Rahu, planets.Ketu), maxRK = Math.max(planets.Rahu, planets.Ketu);
         let allInOneHalf = true, allInOtherHalf = true;
