@@ -949,6 +949,52 @@ app.get('/get-shastra-omens', (req, res) => {
     }
 });
 
+app.post('/ai-astrologer', async (req, res) => {
+    try {
+        const body = req.body;
+        const question = body.question;
+        const context = body.context || '';
+        const lang = body.lang || 'ml';
+        
+        const targetLang = lang === 'ml' ? 'Malayalam' : 'English';
+        
+        const systemPrompt = `You are a highly respected Kerala Vedic Astrologer and spiritual guide. 
+        User's Context/Dream (if any): "${context}"
+        
+        Provide a polite, comforting, spiritual, and accurate astrological or dream interpretation response. 
+        Respond ONLY in ${targetLang} language. Do not use markdown blocks. Keep the response natural and conversational.`;
+
+        const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+        const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+
+        const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3-8b-instruct`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: question }
+                ]
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            res.status(200).json({ success: true, answer: data.result.response.trim() });
+        } else {
+            throw new Error(data.errors ? data.errors[0].message : "Cloudflare AI API Error");
+        }
+
+    } catch (e) {
+        console.error("AI Astrologer Error:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running smoothly on port ${PORT}`);
