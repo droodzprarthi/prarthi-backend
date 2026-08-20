@@ -789,70 +789,7 @@ app.post('/premium-alerts', async (req, res) => {
 // ==========================================
 // 12. Advanced Pan-India Panchang & Festival API
 // ==========================================
-app.post('/monthly-calendar', async (req, res) => {
-    try {
-        const body = req.body;
-        const { year, month, lat, lon } = body; 
 
-        const eph = await load();
-        const daysInMonth = new Date(year, month, 0).getDate();
-        let calendarData = [];
-
-        const solarMonths = ["Mesha (മേടം/Chithirai)", "Vrishabha (ഇടവം/Vaikasi)", "Mithuna (മിഥുനം/Aani)", "Karka (കർക്കടകം/Aadi)", "Simha (ചിങ്ങം/Aavani)", "Kanya (കന്നി/Purattasi)", "Tula (തുലാം/Aippasi)", "Vrischika (വൃശ്ചികം/Karthigai)", "Dhanu (ധനു/Margazhi)", "Makara (മകരം/Thai)", "Kumbha (കുംഭം/Maasi)", "Meena (മീനം/Panguni)"];
-        const lunarMonths = ["Chaitra", "Vaisakha", "Jyeshtha", "Ashadha", "Sravana", "Bhadrapada", "Asvina", "Kartika", "Margasirsha", "Pausha", "Magha", "Phalguna"];
-
-        const festivals = [
-            { l_month: "Chaitra", paksha: "Shukla", tithi: 9, name: "ശ്രീരാമ നവമി (Ram Navami)" },
-            { l_month: "Sravana", paksha: "Krishna", tithi: 8, name: "ശ്രീകൃഷ്ണ ജയന്തി (Janmashtami)" },
-            { l_month: "Asvina", paksha: "Shukla", tithi: 10, name: "വിജയദശമി (Dussehra)" },
-            { l_month: "Kartika", paksha: "Krishna", tithi: 15, name: "ദീപാവലി (Diwali)" }, 
-            { l_month: "Phalguna", paksha: "Shukla", tithi: 15, name: "ഹോളി (Holi)" } 
-        ];
-
-        let currentSolarDay = 1; 
-
-        for (let day = 1; day <= daysInMonth; day++) {
-            let jd = eph.swe_julday(year, month, day, 12.0 - 5.5, Constants.SE_GREG_CAL);
-            eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
-            let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
-
-            let sunDeg = (eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
-            let moonDeg = (eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
-            let sunDegPrev = (eph.swe_calc_ut(jd - 1, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
-
-            let sunRasi = Math.floor(sunDeg / 30), sunRasiPrev = Math.floor(sunDegPrev / 30);
-            let isSankranti = false;
-            if (sunRasi !== sunRasiPrev) { isSankranti = true; currentSolarDay = 1; } else { currentSolarDay++; }
-
-            let diff = (moonDeg - sunDeg + 360) % 360;
-            let tithiIndex = Math.floor(diff / 12) + 1;
-            let paksha = tithiIndex <= 15 ? "Shukla" : "Krishna";
-            let displayTithi = tithiIndex > 15 ? tithiIndex - 15 : tithiIndex; 
-
-            let amantaMonthIdx = Math.floor((sunDeg + (diff > 0 ? 30 : 0)) / 30) % 12;
-            let purnimantaMonthIdx = paksha === "Krishna" ? (amantaMonthIdx + 1) % 12 : amantaMonthIdx;
-            let lMonthName = lunarMonths[amantaMonthIdx];
-
-            let todayFestivals = [];
-            if (isSankranti && sunRasi === 0) todayFestivals.push("വിഷു / Baisakhi");
-            if (isSankranti && sunRasi === 9) todayFestivals.push("മകര സംക്രമം / Pongal");
-            
-            let matchedFestival = festivals.find(f => f.l_month === lMonthName && f.paksha === paksha && f.tithi === displayTithi);
-            if (matchedFestival) todayFestivals.push(matchedFestival.name);
-
-            calendarData.push({
-                gregorian_date: `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`, day: day,
-                solar_date: { month: solarMonths[sunRasi], day: currentSolarDay, is_sankranti: isSankranti },
-                lunar_amanta: { month: lunarMonths[amantaMonthIdx], paksha: paksha, tithi: displayTithi },
-                lunar_purnimanta: { month: lunarMonths[purnimantaMonthIdx], paksha: paksha, tithi: displayTithi },
-                festivals: todayFestivals, is_important: todayFestivals.length > 0 || isSankranti
-            });
-        }
-        res.status(200).json({ success: true, month: month, year: year, calendar: calendarData });
-    } catch (e) {
-        res.status(500).json({ error: e.message, stack: e.stack });
-    }
-});
 
 // ==========================================
 // 13. SHASTRA OMENS (ഗൗളി, സ്വപ്നം, ശകുനം, തുമ്മൽ, കാക്ക)
@@ -949,51 +886,7 @@ app.get('/get-shastra-omens', (req, res) => {
     }
 });
 
-app.post('/ai-astrologer', async (req, res) => {
-    try {
-        const body = req.body;
-        const question = body.question;
-        const context = body.context || '';
-        const lang = body.lang || 'ml';
-        
-        const targetLang = lang === 'ml' ? 'Malayalam' : 'English';
-        
-        const systemPrompt = `You are a highly respected Kerala Vedic Astrologer and spiritual guide. 
-        User's Context/Dream (if any): "${context}"
-        
-        Provide a polite, comforting, spiritual, and accurate astrological or dream interpretation response. 
-        Respond ONLY in ${targetLang} language. Do not use markdown blocks. Keep the response natural and conversational.`;
 
-        const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-        const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-
-        const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3-8b-instruct`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: question }
-                ]
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            res.status(200).json({ success: true, answer: data.result.response.trim() });
-        } else {
-            throw new Error(data.errors ? data.errors[0].message : "Cloudflare AI API Error");
-        }
-
-    } catch (e) {
-        console.error("AI Astrologer Error:", e);
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
