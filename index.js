@@ -886,6 +886,94 @@ app.get('/get-shastra-omens', (req, res) => {
     }
 });
 
+// ==========================================
+// 14. പാൻ-ഇന്ത്യൻ ബലിയിടേണ്ട തീയതി (Next Shraddha / Bali Date)
+// ==========================================
+app.post('/calculate-next-bali', async (req, res) => {
+    try {
+        const body = req.body;
+        // 'solar' (Kerala/TN) അല്ലെങ്കിൽ 'lunar' (North India/Karnataka)
+        const method = body.calculation_method || 'solar'; 
+        
+        const eph = await load();
+        eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
+
+        // 1. മരണ സമയത്തെ വിവരങ്ങൾ (12:00 PM IST സമയമെടുക്കുന്നു)
+        const dJd = eph.swe_julday(body.death_year, body.death_month, body.death_day, 6.5, Constants.SE_GREG_CAL);
+        const dAyanamsa = eph.swe_get_ayanamsa_ut(dJd);
+        const dSun = (eph.swe_calc_ut(dJd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - dAyanamsa + 360) % 360;
+        const dMoon = (eph.swe_calc_ut(dJd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - dAyanamsa + 360) % 360;
+
+        const dDiff = (dMoon - dSun + 360) % 360;
+        const targetTithi = Math.floor(dDiff / 12);
+        const targetSunRasi = Math.floor(dSun / 30); // സൗരമാന മാസം
+
+        // ചന്ദ്രമാസം (Lunar Month) കണ്ടുപിടിക്കാനുള്ള ഫംഗ്ഷൻ (അമാവാസി അടിസ്ഥാനമാക്കി)
+        const getLunarMonth = (jd, tithiIndex) => {
+            let approxAmavasyaJd = jd - (tithiIndex * 0.9843);
+            let aAyanamsa = eph.swe_get_ayanamsa_ut(approxAmavasyaJd);
+            let aSun = (eph.swe_calc_ut(approxAmavasyaJd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - aAyanamsa + 360) % 360;
+            return Math.floor(aSun / 30);
+        };
+
+        const targetLunarMonth = getLunarMonth(dJd, targetTithi); // ചന്ദ്രമാന മാസം
+
+        // 2. ഇന്നത്തെ ദിവസത്തിന് ശേഷം വരുന്ന അടുത്ത ബലി തീയതി കണ്ടുപിടിക്കുന്നു
+        const today = new Date();
+        let currentYear = today.getFullYear();
+        let foundDate = null;
+
+        for (let year = currentYear; year <= currentYear + 1; year++) {
+            let startMonth = body.death_month - 2; 
+            if(startMonth < 1) startMonth = 1;
+            let startDate = new Date(year, startMonth - 1, 1);
+            
+            // ഏകദേശം 120 ദിവസത്തെ ലൂപ്പ്
+            for (let i = 0; i < 120; i++) { 
+                let checkDate = new Date(startDate.getTime() + (i * 86400000));
+                
+                if (checkDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+                    continue;
+                }
+
+                let cJd = eph.swe_julday(checkDate.getFullYear(), checkDate.getMonth() + 1, checkDate.getDate(), 6.5, Constants.SE_GREG_CAL);
+                let cAyanamsa = eph.swe_get_ayanamsa_ut(cJd);
+                let cSun = (eph.swe_calc_ut(cJd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - cAyanamsa + 360) % 360;
+                let cMoon = (eph.swe_calc_ut(cJd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - cAyanamsa + 360) % 360;
+
+                let cDiff = (cMoon - cSun + 360) % 360;
+                let cTithi = Math.floor(cDiff / 12);
+
+                if (method === 'solar') {
+                    // കേരളം/തമിഴ്നാട് രീതി (സൂര്യ രാശി + തിഥി)
+                    let cSunRasi = Math.floor(cSun / 30);
+                    if (cSunRasi === targetSunRasi && cTithi === targetTithi) {
+                        foundDate = checkDate;
+                        break;
+                    }
+                } else {
+                    // ഉത്തരേന്ത്യൻ രീതി (ചന്ദ്രമാസം + തിഥി)
+                    let cLunarMonth = getLunarMonth(cJd, cTithi);
+                    if (cLunarMonth === targetLunarMonth && cTithi === targetTithi) {
+                        foundDate = checkDate;
+                        break;
+                    }
+                }
+            }
+            if (foundDate) break;
+        }
+
+        res.status(200).json({
+            success: true,
+            target_tithi_index: targetTithi,
+            calculation_method: method,
+            next_bali_date: foundDate ? foundDate.toISOString().split('T')[0] : null
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message, stack: e.stack });
+    }
+});
+
 
 
 const PORT = process.env.PORT || 3000;
