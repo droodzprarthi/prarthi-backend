@@ -56,7 +56,14 @@ app.post('/generate-horoscope', async (req, res) => {
         for (let p of planets) {
           const pos = eph.swe_calc_ut(jd, p.id, Constants.SEFLG_SWIEPH);
           let siderealDeg = (pos.xx[0] - ayanamsa + 360) % 360;
-          positions[p.name] = { degree: siderealDeg };
+          
+          // 🌟 പുതിയതായി ചേർത്തത്: Speed നെഗറ്റീവ് ആണെങ്കിൽ അത് വക്രഗതിയാണ് (Retrograde) 🌟
+          let isRetrograde = pos.xx[3] < 0; 
+          
+          positions[p.name] = { 
+              degree: siderealDeg, 
+              is_retrograde: isRetrograde // ആപ്പിലേക്ക് അയക്കുന്നു
+          };
         }
         positions["Ketu"] = { degree: (positions["Rahu"].degree + 180) % 360 };
 
