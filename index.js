@@ -982,7 +982,7 @@ app.post('/calculate-next-bali', async (req, res) => {
 });
 
 // ==========================================
-// 16. YEARLY FESTIVAL CALCULATOR (Dynamic using SwissEph)
+// 16. FULL YEARLY FESTIVAL CALCULATOR (Dynamic using SwissEph)
 // ==========================================
 app.post('/calculate-yearly-festivals', async (req, res) => {
     try {
@@ -991,68 +991,75 @@ app.post('/calculate-yearly-festivals', async (req, res) => {
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
         let festivals = [];
-        let vishuFound = false;
+        let oneTimeEvents = { vishu: false, makarSankranti: false };
 
-        // ജനുവരി 1 മുതൽ ഡിസംബർ 31 വരെ ഓരോ ദിവസവും ചെക്ക് ചെയ്യുന്നു
+        // ജനുവരി 1 മുതൽ ഡിസംബർ 31 വരെ ഓരോ ദിവസവും ലൂപ്പ് ചെയ്യുന്നു
         let startDate = new Date(year, 0, 1);
         for (let i = 0; i < 366; i++) {
             let checkDate = new Date(startDate.getTime() + (i * 86400000));
             if (checkDate.getFullYear() > year) break;
 
-            // ഉച്ചയ്ക്കുള്ള സമയം (12:00 PM) വെച്ച് കണക്കുകൂട്ടുന്നു
             let jd = eph.swe_julday(checkDate.getFullYear(), checkDate.getMonth() + 1, checkDate.getDate(), 6.5, Constants.SE_GREG_CAL);
             let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
 
             let sunDeg = (eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
             let moonDeg = (eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
 
-            let sunRasi = Math.floor(sunDeg / 30); // 0=മേടം, 4=ചിങ്ങം, 6=തുലാം, 10=കുംഭം
-            let nakshatra = Math.floor(moonDeg / (360 / 27)); // 21=തിരുവോണം, 3=രോഹിണി
-            let tithi = Math.floor(((moonDeg - sunDeg + 360) % 360) / 12); // 0=പ്രഥമ... 29=അമാവാസി, 14=പൗർണ്ണമി
+            let sunRasi = Math.floor(sunDeg / 30); // 0=മേടം, 1=ഇടവം, ..., 4=ചിങ്ങം, ..., 11=മീനം
+            let nakshatra = Math.floor(moonDeg / (360 / 27)); // 21=തിരുവോണം, 3=രോഹിണി, 10=പൂരം
+            let tithi = Math.floor(((moonDeg - sunDeg + 360) % 360) / 12); // 0-14 ശുക്ലപക്ഷം, 15-29 കൃഷ്ണപക്ഷം (14=പൗർണ്ണമി, 29=അമാവാസി)
 
             let dateString = checkDate.toISOString().split('T')[0];
 
-            // 1. ഓണം (ചിങ്ങ മാസത്തിലെ തിരുവോണം നക്ഷത്രം)
-            if (sunRasi === 4 && nakshatra === 21) {
-                festivals.push({ name_ml: "തിരുവോണം", name_en: "Thiruvonam", date: dateString, icon: "🌸", color_hex: "0xFF4CAF50" });
-            }
+            // Helper function to add festival
+            const addF = (ml, en, icon, color) => {
+                festivals.push({ name_ml: ml, name_en: en, date: dateString, icon: icon, color_hex: color });
+            };
 
-            // 2. വിഷു (സൂര്യൻ മേടം രാശിയിലേക്ക് മാറുന്ന ദിവസം)
-            if (sunRasi === 0 && !vishuFound) {
-                festivals.push({ name_ml: "വിഷു", name_en: "Vishu", date: dateString, icon: "🎆", color_hex: "0xFFFF9800" });
-                vishuFound = true; // വർഷത്തിൽ ഒരിക്കൽ മാത്രം
-            }
+            // =====================================
+            // 🌸 കേരളത്തിലെ പ്രധാന ആഘോഷങ്ങൾ 🌸
+            // =====================================
+            if (sunRasi === 4 && nakshatra === 21) addF("തിരുവോണം", "Thiruvonam", "🌸", "0xFF4CAF50");
+            if (sunRasi === 0 && !oneTimeEvents.vishu) { addF("വിഷു", "Vishu", "🎆", "0xFFFF9800"); oneTimeEvents.vishu = true; }
+            if (sunRasi === 4 && tithi === 22 && nakshatra === 3) addF("ശ്രീകൃഷ്ണ ജയന്തി (അഷ്ടമി രോഹിണി)", "Sree Krishna Jayanthi", "🦚", "0xFF00BCD4");
+            if (sunRasi === 0 && nakshatra === 10) addF("തൃശ്ശൂർ പൂരം", "Thrissur Pooram", "🐘", "0xFFFFC107");
+            if (sunRasi === 10 && nakshatra === 10) addF("ആറ്റുകാൽ പൊങ്കാല", "Attukal Pongala", "🔥", "0xFFE91E63");
+            if (sunRasi === 8 && nakshatra === 5) addF("തിരുവാതിര", "Thiruvathira", "💃", "0xFF9C27B0");
+            if (sunRasi === 9 && nakshatra === 7) addF("തൈപ്പൂയം", "Thaipusam", "🪔", "0xFFFF5722");
+            if (sunRasi === 4 && nakshatra === 23) addF("ശ്രീനാരായണ ഗുരു ജയന്തി", "Sree Narayana Guru Jayanthi", "✨", "0xFFFFD700");
+            if (sunRasi === 5 && nakshatra === 23) addF("ശ്രീനാരായണ ഗുരു സമാധി", "Sree Narayana Guru Samadhi", "🕊️", "0xFFBDBDBD");
 
-            // 3. ദീപാവലി (തുലാം മാസത്തിലെ അമാവാസി)
-            if (sunRasi === 6 && tithi === 29) {
-                festivals.push({ name_ml: "ദീപാവലി", name_en: "Diwali", date: dateString, icon: "🪔", color_hex: "0xFFF44336" });
-            }
-
-            // 4. മഹാശിവരാത്രി (കുംഭം/മീനം മാസത്തിലെ കൃഷ്ണപക്ഷ ചതുർദശി)
-            if ((sunRasi === 10 || sunRasi === 11) && tithi === 28) {
-                festivals.push({ name_ml: "മഹാശിവരാത്രി", name_en: "Maha Shivaratri", date: dateString, icon: "🔱", color_hex: "0xFF3F51B5" });
-            }
-
-            // 5. ശ്രീകൃഷ്ണ ജയന്തി (ചിങ്ങ മാസത്തിലെ അഷ്ടമി രോഹിണി)
-            if (sunRasi === 4 && tithi === 22 && nakshatra === 3) {
-                festivals.push({ name_ml: "ശ്രീകൃഷ്ണ ജയന്തി", name_en: "Sree Krishna Jayanthi", date: dateString, icon: "🦚", color_hex: "0xFF00BCD4" });
-            }
-
-            // 6. ഗണേശ ചതുർത്ഥി (ചിങ്ങ മാസത്തിലെ ശുക്ലപക്ഷ ചതുർത്ഥി)
-            if (sunRasi === 4 && tithi === 3) {
-                festivals.push({ name_ml: "വിനായക ചതുർത്ഥി", name_en: "Ganesha Chaturthi", date: dateString, icon: "🐘", color_hex: "0xFFFFC107" });
-            }
+            // =====================================
+            // 🪔 പാൻ-ഇന്ത്യൻ (Pan-Indian) ആഘോഷങ്ങൾ 🪔
+            // =====================================
+            if (sunRasi === 6 && tithi === 29) addF("ദീപാവലി", "Diwali", "🪔", "0xFFF44336");
+            if ((sunRasi === 10 || sunRasi === 11) && tithi === 28) addF("മഹാശിവരാത്രി", "Maha Shivaratri", "🔱", "0xFF3F51B5");
+            if (sunRasi === 4 && tithi === 3) addF("വിനായക ചതുർത്ഥി", "Ganesha Chaturthi", "🐘", "0xFFFFC107");
+            if (sunRasi === 5 && tithi === 0) addF("നവരാത്രി ആരംഭം", "Navaratri Begins", "🪷", "0xFFE91E63");
+            if (sunRasi === 5 && tithi === 7) addF("ദുർഗ്ഗാഷ്ടമി", "Durga Ashtami", "📖", "0xFFD32F2F");
+            if (sunRasi === 5 && tithi === 8) addF("മഹാനവമി", "Maha Navami", "⚔️", "0xFFC2185B");
+            if (sunRasi === 5 && tithi === 9) addF("വിജയദശമി (വിദ്യാരംഭം)", "Vijayadashami", "✍️", "0xFF4CAF50");
+            if (sunRasi === 9 && !oneTimeEvents.makarSankranti) { addF("മകര സംക്രാന്തി / പൊങ്കൽ", "Makar Sankranti / Pongal", "🌞", "0xFFFF9800"); oneTimeEvents.makarSankranti = true; }
+            if ((sunRasi === 10 || sunRasi === 11) && tithi === 14) addF("ഹോളി", "Holi", "🎨", "0xFFE040FB");
+            if ((sunRasi === 11 || sunRasi === 0) && tithi === 8) addF("ശ്രീരാമ നവമി", "Sri Rama Navami", "🏹", "0xFFFFC107");
+            if (sunRasi === 3 && tithi === 14) addF("ഗുരു പൂർണ്ണിമ", "Guru Purnima", "🌕", "0xFFFFB300");
+            if ((sunRasi === 3 || sunRasi === 4) && tithi === 14) addF("രക്ഷാബന്ധൻ", "Raksha Bandhan", "🎀", "0xFFE91E63");
+            if (sunRasi === 8 && tithi === 10) addF("വൈകുണ്ഠ ഏകാദശി", "Vaikuntha Ekadashi", "🚪", "0xFF2196F3");
+            if (sunRasi === 1 && tithi === 14) addF("ബുദ്ധ പൂർണ്ണിമ", "Buddha Purnima", "🧘", "0xFFFFD54F");
+            if ((sunRasi === 0 || sunRasi === 1) && tithi === 2) addF("അക്ഷയ തൃതീയ", "Akshaya Tritiya", "🪙", "0xFFFFD700");
+            if ((sunRasi === 11 || sunRasi === 0) && tithi === 0) addF("ഉഗാദി / ഗുഡി പഡ്വ", "Ugadi / Gudi Padwa", "🌿", "0xFF8BC34A");
             
-            // 7. നവരാത്രി ആരംഭം (കന്നി മാസത്തിലെ ശുക്ലപക്ഷ പ്രഥമ)
-            if (sunRasi === 5 && tithi === 0) {
-                festivals.push({ name_ml: "നവരാത്രി ആരംഭം", name_en: "Navaratri Begins", date: dateString, icon: "🪷", color_hex: "0xFFE91E63" });
-            }
+            // കർക്കടക വാവ് (കർക്കടക മാസത്തിലെ അമാവാസി)
+            if (sunRasi === 3 && tithi === 29) addF("കർക്കടക വാവ് ബലി", "Karkidaka Vavu Bali", "🌾", "0xFF795548");
         }
 
-        // തിയ്യതി അനുസരിച്ച് ഓർഡർ ചെയ്യുക
+        // തീയതി അനുസരിച്ച് ക്രമീകരിക്കുക
         festivals.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        res.status(200).json({ success: true, year: year, festivals: festivals });
+        // ഡ്യൂപ്ലിക്കേറ്റുകൾ ഒഴിവാക്കാൻ
+        let uniqueFestivals = festivals.filter((v, i, a) => a.findIndex(t => (t.name_ml === v.name_ml && t.date === v.date)) === i);
+
+        res.status(200).json({ success: true, year: year, count: uniqueFestivals.length, festivals: uniqueFestivals });
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
