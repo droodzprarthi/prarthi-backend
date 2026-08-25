@@ -1065,6 +1065,60 @@ app.post('/calculate-yearly-festivals', async (req, res) => {
     }
 });
 
+// ==========================================
+// 17. അടുത്ത വ്രതങ്ങളുടെ തീയതി കണ്ടുപിടിക്കാനുള്ള API (Next Vratham Dates)
+// ==========================================
+app.post('/calculate-upcoming-vrathams', async (req, res) => {
+    try {
+        const eph = await load();
+        eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
+
+        let today = new Date();
+        let vrathamDates = {
+            "ekadashi": null, "pradosham": null, "shashti": null,
+            "chaturthi": null, "pournami": null, "amavasya": null,
+            "shivaratri": null, "somavaram": null, "chovvazhcha": null,
+            "velliyazhcha": null, "vyazhazhcha": null, "shaniyazhcha": null
+        };
+
+        // അടുത്ത 35 ദിവസത്തേക്ക് തിഥിയും ആഴ്ചയും പരിശോധിക്കുന്നു
+        for (let i = 0; i <= 35; i++) {
+            let checkDate = new Date(today.getTime() + (i * 86400000));
+            
+            // 6:00 AM IST = 0.5 UT (സൂര്യോദയ സമയത്തെ തിഥി എടുക്കാൻ)
+            let jd = eph.swe_julday(checkDate.getFullYear(), checkDate.getMonth() + 1, checkDate.getDate(), 0.5, Constants.SE_GREG_CAL);
+            let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
+
+            let sunDeg = (eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
+            let moonDeg = (eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
+
+            let tithi = Math.floor(((moonDeg - sunDeg + 360) % 360) / 12); 
+            let dayOfWeek = checkDate.getDay(); 
+            let dateStr = checkDate.toISOString().split('T')[0];
+
+            // തിഥികൾ അടിസ്ഥാനമാക്കിയുള്ളവ (ഏറ്റവും ആദ്യം വരുന്ന തിയതി മാത്രം സേവ് ചെയ്യുന്നു)
+            if ((tithi === 10 || tithi === 25) && !vrathamDates.ekadashi) vrathamDates.ekadashi = dateStr;
+            if ((tithi === 12 || tithi === 27) && !vrathamDates.pradosham) vrathamDates.pradosham = dateStr;
+            if ((tithi === 5 || tithi === 20) && !vrathamDates.shashti) vrathamDates.shashti = dateStr;
+            if ((tithi === 3 || tithi === 18) && !vrathamDates.chaturthi) vrathamDates.chaturthi = dateStr;
+            if (tithi === 14 && !vrathamDates.pournami) vrathamDates.pournami = dateStr;
+            if (tithi === 29 && !vrathamDates.amavasya) vrathamDates.amavasya = dateStr;
+            if (tithi === 28 && !vrathamDates.shivaratri) vrathamDates.shivaratri = dateStr; // കൃഷ്ണ ചതുർദ്ദശി
+
+            // ആഴ്ചകൾ അടിസ്ഥാനമാക്കിയുള്ളവ
+            if (dayOfWeek === 1 && !vrathamDates.somavaram) vrathamDates.somavaram = dateStr;
+            if (dayOfWeek === 2 && !vrathamDates.chovvazhcha) vrathamDates.chovvazhcha = dateStr;
+            if (dayOfWeek === 4 && !vrathamDates.vyazhazhcha) vrathamDates.vyazhazhcha = dateStr;
+            if (dayOfWeek === 5 && !vrathamDates.velliyazhcha) vrathamDates.velliyazhcha = dateStr;
+            if (dayOfWeek === 6 && !vrathamDates.shaniyazhcha) vrathamDates.shaniyazhcha = dateStr;
+        }
+
+        res.status(200).json({ success: true, next_dates: vrathamDates });
+    } catch (e) {
+        res.status(500).json({ error: e.message, stack: e.stack });
+    }
+});
+
 
 
 const PORT = process.env.PORT || 3000;
