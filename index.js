@@ -80,31 +80,110 @@ app.post('/generate-horoscope', async (req, res) => {
 // ==========================================
 // 2. പഞ്ചാംഗം ഗണിക്കുന്ന ഭാഗം (Panchangam API)
 // ==========================================
+// ==========================================
+// 2. പഞ്ചാംഗം & കൃത്യമായ അവസാന സമയം (Exact End Timings)
+// ==========================================
 app.post('/get-panchangam', async (req, res) => {
     try {
         const body = req.body;
+        // IST സമയത്തെ Universal Time (UT) ലേക്ക് മാറ്റുന്നു
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
         
         const eph = await load();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
-        const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
+        
+        // 🌟 പുതിയ ഫംഗ്ഷൻ: ഓരോ മിനിറ്റും പരിശോധിച്ച് അവസാന സമയം കണ്ടുപിടിക്കാൻ 🌟
+        const getEndTime = (startJd, type, currentIndex) => {
+            let step = 1 / 24; // 1 മണിക്കൂർ വെച്ച് മുന്നോട്ട് പോകുന്നു
+            let currentJd = startJd;
+            
+            for (let i = 0; i < 30; i++) { // പരമാവധി 30 മണിക്കൂർ വരെ പരിശോധിക്കുന്നു
+                currentJd += step;
+                let aya = eph.swe_get_ayanamsa_ut(currentJd);
+                let pSun = eph.swe_calc_ut(currentJd, Constants.SE_SUN, Constants.SEFLG_SWIEPH);
+                let pMoon = eph.swe_calc_ut(currentJd, Constants.SE_MOON, Constants.SEFLG_SWIEPH);
+                let sLon = (pSun.xx[0] - aya + 360) % 360;
+                let mLon = (pMoon.xx[0] - aya + 360) % 360;
+                
+                let newIndex = type === 'tithi' 
+                    ? Math.floor(((mLon - sLon + 360) % 360) / 12)
+                    : Math.floor(mLon / (360 / 27));
 
+                if (newIndex !== currentIndex) {
+                    // ഇൻഡക്സ് മാറിയാൽ, 1 മണിക്കൂർ പുറകോട്ട് പോയി മിനിറ്റ് വെച്ച് പരിശോധിക്കുന്നു
+                    currentJd -= step;
+                    let minStep = 1 / 1440; // 1 മിനിറ്റ്
+                    
+                    for (let m = 0; m <= 60; m++) {
+                        currentJd += minStep;
+                        let mAya = eph.swe_get_ayanamsa_ut(currentJd);
+                        let mSun = eph.swe_calc_ut(currentJd, Constants.SE_SUN, Constants.SEFLG_SWIEPH);
+                        let mMoon = eph.swe_calc_ut(currentJd, Constants.SE_MOON, Constants.SEFLG_SWIEPH);
+                        let msLon = (mSun.xx[0] - mAya + 360) % 360;
+                        let mmLon = (mMoon.xx[0] - mAya + 360) % 360;
+                        
+                        let checkIndex = type === 'tithi' 
+                            ? Math.floor(((mmLon - msLon + 360) % 360) / 12)
+                            : Math.floor(mmLon / (360 / 27));
+
+                        if (checkIndex !== currentIndex) {
+                            // കൃത്യമായ മിനിറ്റ് ലഭിച്ചാൽ അത് IST സമയത്തിലേക്ക് മാറ്റുന്നു
+                            let totalHours = (currentJd + 0.5 - Math.floor(currentJd + 0.5)) * 24;
+                            totalHours += 5.5; // IST യിലേക്ക് മാറ്റുന്നു
+                            let isNextDay = false;
+                            
+                            if (totalHours >= 24) { 
+                                totalHours -= 24; 
+                                isNextDay = true; 
+                            }
+                            
+                            let h = Math.floor(totalHours);
+                            let min = Math.floor((totalHours - h) * 60);
+                            let ampm = h >= 12 ? 'PM' : 'AM';
+                            h = h % 12; 
+                            if (h === 0) h = 12;
+                            
+                            let timeStr = `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')} ${ampm}`;
+                            // പിറ്റേ ദിവസമാണ് അവസാനിക്കുന്നതെങ്കിൽ അത് സൂചിപ്പിക്കാൻ
+                            return isNextDay ? `${timeStr} (നാളെ)` : timeStr;
+                        }
+                    }
+                }
+            }
+            return "നാളെ ശേഷം";
+        };
+
+        const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
         const sunPos = eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH);
         const moonPos = eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH);
 
-        let sunTropical = sunPos.xx[0], moonTropical = moonPos.xx[0];
-        let sunSidereal = (sunTropical - ayanamsa + 360) % 360;
-        let moonSidereal = (moonTropical - ayanamsa + 360) % 360;
+        let sunSidereal = (sunPos.xx[0] - ayanamsa + 360) % 360;
+        let moonSidereal = (moonPos.xx[0] - ayanamsa + 360) % 360;
 
-        let diff = (moonTropical - sunTropical + 360) % 360; 
+        let diff = (moonSidereal - sunSidereal + 360) % 360; 
         let tithiIndex = Math.floor(diff / 12);
         let nakshatraIndex = Math.floor(moonSidereal / (360 / 27));
         let yogaIndex = Math.floor(((sunSidereal + moonSidereal) % 360) / (360 / 27));
         let karanaIndex = Math.floor(diff / 6);
         let dayOfWeek = new Date(body.year, body.month - 1, body.day).getDay();
 
-        res.status(200).json({ success: true, tithi_index: tithiIndex, nakshatra_index: nakshatraIndex, yoga_index: yogaIndex, karana_index: karanaIndex, day_of_week: dayOfWeek, sun_degree: sunSidereal, moon_degree: moonSidereal });
+        // 🌟 തിഥിയുടെയും നക്ഷത്രത്തിന്റെയും അവസാന സമയം കണ്ടുപിടിക്കുന്നു 🌟
+        let tithiEnd = getEndTime(jd, 'tithi', tithiIndex);
+        let nakshatraEnd = getEndTime(jd, 'nakshatra', nakshatraIndex);
+
+        res.status(200).json({ 
+            success: true, 
+            tithi_index: tithiIndex, 
+            tithi_end_time: tithiEnd,          // ആപ്പിലേക്ക് അയക്കുന്നു
+            nakshatra_index: nakshatraIndex, 
+            nakshatra_end_time: nakshatraEnd,  // ആപ്പിലേക്ക് അയക്കുന്നു
+            yoga_index: yogaIndex, 
+            karana_index: karanaIndex, 
+            day_of_week: dayOfWeek, 
+            sun_degree: sunSidereal, 
+            moon_degree: moonSidereal 
+        });
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
