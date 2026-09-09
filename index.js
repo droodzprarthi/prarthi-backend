@@ -7,6 +7,32 @@ app.use(cors());
 app.use(express.json());
 
 // ==========================================
+// 🚀 IN-MEMORY CACHE ENGINE (POST & GET Caching)
+// സെർവർ ലോഡ് കുറയ്ക്കാനും സ്പീഡ് കൂട്ടാനുമുള്ള കാഷ് സിസ്റ്റം
+// ==========================================
+const apiCache = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 മണിക്കൂർ വാലിഡിറ്റി
+
+const getCachedResponse = (key) => {
+    const cached = apiCache.get(key);
+    if (!cached) return null;
+    if (Date.now() - cached.timestamp > CACHE_TTL) {
+        apiCache.delete(key);
+        return null;
+    }
+    return cached.data;
+};
+
+const setCachedResponse = (key, data) => {
+    // കാഷ് മെമ്മറി 2000 ഐറ്റത്തിൽ കൂടുതൽ ആയാൽ പഴയവ ഒഴിവാക്കുന്നു
+    if (apiCache.size > 2000) {
+        const oldestKey = apiCache.keys().next().value;
+        apiCache.delete(oldestKey);
+    }
+    apiCache.set(key, { data, timestamp: Date.now() });
+};
+
+// ==========================================
 // MAGIC WRAPPER: Unified & Consistent Code
 // ==========================================
 const Constants = swisseph;
@@ -28,7 +54,8 @@ const load = async () => eph;
 
 // സെർവർ വർക്ക് ചെയ്യുന്നുണ്ടോ എന്ന് പരിശോധിക്കാനുള്ള വഴി
 app.get('/', (req, res) => {
-    res.send("Prarthi Astrology Backend is Running Perfectly with Native SwissEph!");
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send("Prarthi Astrology Backend is Running Perfectly with Native SwissEph & Caching Engine!");
 });
 
 // ==========================================
@@ -37,6 +64,14 @@ app.get('/', (req, res) => {
 app.post('/generate-horoscope', async (req, res) => {
     try {
         const body = req.body;
+        const cacheKey = `horoscope_${body.year}_${body.month}_${body.day}_${body.hour}_${body.min}_${body.lat}_${body.lon}`;
+        
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
 
         const eph = await load();
@@ -57,12 +92,11 @@ app.post('/generate-horoscope', async (req, res) => {
           const pos = eph.swe_calc_ut(jd, p.id, Constants.SEFLG_SWIEPH);
           let siderealDeg = (pos.xx[0] - ayanamsa + 360) % 360;
           
-          // 🌟 പുതിയതായി ചേർത്തത്: Speed നെഗറ്റീവ് ആണെങ്കിൽ അത് വക്രഗതിയാണ് (Retrograde) 🌟
           let isRetrograde = pos.xx[3] < 0; 
           
           positions[p.name] = { 
               degree: siderealDeg, 
-              is_retrograde: isRetrograde // ആപ്പിലേക്ക് അയക്കുന്നു
+              is_retrograde: isRetrograde
           };
         }
         positions["Ketu"] = { degree: (positions["Rahu"].degree + 180) % 360 };
@@ -71,34 +105,46 @@ app.post('/generate-horoscope', async (req, res) => {
         let ascendantSidereal = (houses.ascendant - ayanamsa + 360) % 360;
         const nakshatraIndex = Math.floor(positions["Moon"].degree / (360 / 27));
 
-        res.status(200).json({ success: true, ascendant: ascendantSidereal, planets: positions, nakshatra_index: nakshatraIndex });
+        const responseData = { 
+            success: true, 
+            ascendant: ascendantSidereal, 
+            planets: positions, 
+            nakshatra_index: nakshatraIndex 
+        };
+
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
 
 // ==========================================
-// 2. പഞ്ചാംഗം ഗണിക്കുന്ന ഭാഗം (Panchangam API)
-// ==========================================
-// ==========================================
 // 2. പഞ്ചാംഗം & കൃത്യമായ അവസാന സമയം (Exact End Timings)
 // ==========================================
 app.post('/get-panchangam', async (req, res) => {
     try {
         const body = req.body;
-        // IST സമയത്തെ Universal Time (UT) ലേക്ക് മാറ്റുന്നു
+        const cacheKey = `panchang_${body.year}_${body.month}_${body.day}_${body.hour}_${body.min}_${body.lat}_${body.lon}`;
+        
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
         
         const eph = await load();
         const jd = eph.swe_julday(body.year, body.month, body.day, floatHour, Constants.SE_GREG_CAL);
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
         
-        // 🌟 പുതിയ ഫംഗ്ഷൻ: ഓരോ മിനിറ്റും പരിശോധിച്ച് അവസാന സമയം കണ്ടുപിടിക്കാൻ 🌟
         const getEndTime = (startJd, type, currentIndex) => {
-            let step = 1 / 24; // 1 മണിക്കൂർ വെച്ച് മുന്നോട്ട് പോകുന്നു
+            let step = 1 / 24; 
             let currentJd = startJd;
             
-            for (let i = 0; i < 30; i++) { // പരമാവധി 30 മണിക്കൂർ വരെ പരിശോധിക്കുന്നു
+            for (let i = 0; i < 30; i++) { 
                 currentJd += step;
                 let aya = eph.swe_get_ayanamsa_ut(currentJd);
                 let pSun = eph.swe_calc_ut(currentJd, Constants.SE_SUN, Constants.SEFLG_SWIEPH);
@@ -111,9 +157,8 @@ app.post('/get-panchangam', async (req, res) => {
                     : Math.floor(mLon / (360 / 27));
 
                 if (newIndex !== currentIndex) {
-                    // ഇൻഡക്സ് മാറിയാൽ, 1 മണിക്കൂർ പുറകോട്ട് പോയി മിനിറ്റ് വെച്ച് പരിശോധിക്കുന്നു
                     currentJd -= step;
-                    let minStep = 1 / 1440; // 1 മിനിറ്റ്
+                    let minStep = 1 / 1440; 
                     
                     for (let m = 0; m <= 60; m++) {
                         currentJd += minStep;
@@ -128,9 +173,8 @@ app.post('/get-panchangam', async (req, res) => {
                             : Math.floor(mmLon / (360 / 27));
 
                         if (checkIndex !== currentIndex) {
-                            // കൃത്യമായ മിനിറ്റ് ലഭിച്ചാൽ അത് IST സമയത്തിലേക്ക് മാറ്റുന്നു
                             let totalHours = (currentJd + 0.5 - Math.floor(currentJd + 0.5)) * 24;
-                            totalHours += 5.5; // IST യിലേക്ക് മാറ്റുന്നു
+                            totalHours += 5.5; 
                             let isNextDay = false;
                             
                             if (totalHours >= 24) { 
@@ -145,7 +189,6 @@ app.post('/get-panchangam', async (req, res) => {
                             if (h === 0) h = 12;
                             
                             let timeStr = `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')} ${ampm}`;
-                            // പിറ്റേ ദിവസമാണ് അവസാനിക്കുന്നതെങ്കിൽ അത് സൂചിപ്പിക്കാൻ
                             return isNextDay ? `${timeStr} (നാളെ)` : timeStr;
                         }
                     }
@@ -168,22 +211,25 @@ app.post('/get-panchangam', async (req, res) => {
         let karanaIndex = Math.floor(diff / 6);
         let dayOfWeek = new Date(body.year, body.month - 1, body.day).getDay();
 
-        // 🌟 തിഥിയുടെയും നക്ഷത്രത്തിന്റെയും അവസാന സമയം കണ്ടുപിടിക്കുന്നു 🌟
         let tithiEnd = getEndTime(jd, 'tithi', tithiIndex);
         let nakshatraEnd = getEndTime(jd, 'nakshatra', nakshatraIndex);
 
-        res.status(200).json({ 
+        const responseData = { 
             success: true, 
             tithi_index: tithiIndex, 
-            tithi_end_time: tithiEnd,          // ആപ്പിലേക്ക് അയക്കുന്നു
+            tithi_end_time: tithiEnd,          
             nakshatra_index: nakshatraIndex, 
-            nakshatra_end_time: nakshatraEnd,  // ആപ്പിലേക്ക് അയക്കുന്നു
+            nakshatra_end_time: nakshatraEnd,  
             yoga_index: yogaIndex, 
             karana_index: karanaIndex, 
             day_of_week: dayOfWeek, 
             sun_degree: sunSidereal, 
             moon_degree: moonSidereal 
-        });
+        };
+
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -195,6 +241,13 @@ app.post('/get-panchangam', async (req, res) => {
 app.post('/calculate-porutham', async (req, res) => {
     try {
         const body = req.body;
+        const cacheKey = `porutham_${JSON.stringify(body)}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         const eph = await load();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
@@ -306,7 +359,7 @@ app.post('/calculate-porutham', async (req, res) => {
         let manglikMatch = (boy.is_manglik === girl.is_manglik);
         let sarpaDoshaMatch = (boy.has_sarpa_dosham === girl.has_sarpa_dosham);
 
-        res.status(200).json({ 
+        const responseData = { 
             success: true, 
             kerala_10_porutham: { 
                 score: `${tenPoruthamScore}/10`, 
@@ -337,21 +390,29 @@ app.post('/calculate-porutham', async (req, res) => {
                 has_dasa_sandhi: hasDasaSandhi, 
                 warning: hasDasaSandhi ? "വിവാഹ സമയത്ത് ഇരുവർക്കും ഒരേസമയം ദശാമാറ്റം വരുന്നതിനാൽ ദശാസന്ധി ദോഷമുണ്ട്." : "ദശാസന്ധി ദോഷമില്ല."
             }
-        });
+        };
+
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
 
 // ==========================================
-// 4. സമ്പൂർണ്ണ ദോഷ നിർണ്ണയം
-// ==========================================
-// ==========================================
 // 4. സമ്പൂർണ്ണ ദോഷ നിർണ്ണയം (Manglik Dosha Fixed)
 // ==========================================
 app.post('/calculate-dosha', async (req, res) => {
     try {
         const body = req.body;
+        const cacheKey = `dosha_${JSON.stringify(body)}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
         const eph = await load();
@@ -386,8 +447,7 @@ app.post('/calculate-dosha', async (req, res) => {
         let marsFromAsc = getHouseDifference(ascRasi, marsRasi), marsFromMoon = getHouseDifference(moonRasi, marsRasi);
         const manglikHouses = [1, 2, 4, 7, 8, 12];
         
-        // 🌟 ഫിക്സ് 5: ചൊവ്വാദോഷത്തിന് പ്രധാനപ്പെട്ട Exception നൽകി (സ്വക്ഷേത്രം & ഉച്ചം) 🌟
-        let isMarsStrong = [1, 8, 10].includes(marsRasi); // 1-മേടം, 8-വൃശ്ചികം, 10-മകരം
+        let isMarsStrong = [1, 8, 10].includes(marsRasi); 
         let isManglikAsc = manglikHouses.includes(marsFromAsc);
         let isManglikMoon = manglikHouses.includes(marsFromMoon);
         let hasManglikDosha = (isManglikAsc || isManglikMoon) && !isMarsStrong;
@@ -424,14 +484,18 @@ app.post('/calculate-dosha', async (req, res) => {
         }
         let hasKemadruma = !hasPlanetIn2_12;
 
-        res.status(200).json({
+        const responseData = {
           success: true,
           manglik_dosha: { has_dosha: hasManglikDosha, from_ascendant: isManglikAsc, from_moon: isManglikMoon, mars_position: marsFromAsc },
           kaal_sarp_dosha: { has_dosha: hasKaalSarp }, pitra_dosha: { has_dosha: hasPitraDosha },
           sani_dosha: { has_dosha: hasSaniDosha, is_sade_sati: isSadeSati, is_kandaka_sani: isKandakaSani, is_ashtama_sani: isAshtamaSani },
           gandmool_dosha: { has_dosha: hasGandmool }, guru_chandal_dosha: { has_dosha: hasGuruChandal },
           grahan_dosha: { has_dosha: hasGrahan }, vish_dosha: { has_dosha: hasVish }, kemadruma_dosha: { has_dosha: hasKemadruma }
-        });
+        };
+
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -444,6 +508,13 @@ app.post('/calculate-muhurtha', async (req, res) => {
     try {
         const body = req.body;
         let lat = body.lat || 9.9312, lon = body.lon || 76.2673;
+        const cacheKey = `muhurtha_${body.year}_${body.month}_${body.day}_${lat}_${lon}`;
+
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
 
         const eph = await load();
         let jd = eph.swe_julday(body.year, body.month, body.day, 6.5, Constants.SE_GREG_CAL);
@@ -511,7 +582,17 @@ app.post('/calculate-muhurtha', async (req, res) => {
         let gulikaTime = `${formatTime(sunrise + gulikaIndex * segmentLen)} - ${formatTime(sunrise + (gulikaIndex + 1) * segmentLen)}`;
         let yamaTime = `${formatTime(sunrise + yamaIndex * segmentLen)} - ${formatTime(sunrise + (yamaIndex + 1) * segmentLen)}`;
 
-        res.status(200).json({ success: true, hora: horaList, gowri_day: gowriDay, gowri_night: gowriNight, kaalangal: { rahu: rahuTime, gulika: gulikaTime, yama: yamaTime } });
+        const responseData = { 
+            success: true, 
+            hora: horaList, 
+            gowri_day: gowriDay, 
+            gowri_night: gowriNight, 
+            kaalangal: { rahu: rahuTime, gulika: gulikaTime, yama: yamaTime } 
+        };
+
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -523,6 +604,13 @@ app.post('/calculate-muhurtha', async (req, res) => {
 app.post('/calculate-dasha', async (req, res) => {
     try {
         const body = req.body;
+        const cacheKey = `dasha_${JSON.stringify(body)}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
 
         const eph = await load();
@@ -561,7 +649,10 @@ app.post('/calculate-dasha', async (req, res) => {
           currentTimestamp = endMs;
         }
 
-        res.status(200).json({ success: true, balance_dasha: { lord: dashaLords[startDashaIndex], years: balanceYears }, dashas: dashaList });
+        const responseData = { success: true, balance_dasha: { lord: dashaLords[startDashaIndex], years: balanceYears }, dashas: dashaList };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -573,6 +664,13 @@ app.post('/calculate-dasha', async (req, res) => {
 app.post('/calculate-vargas', async (req, res) => {
     try {
         const body = req.body;
+        const cacheKey = `vargas_${JSON.stringify(body)}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
         const eph = await load();
@@ -630,7 +728,10 @@ app.post('/calculate-vargas', async (req, res) => {
             for (let [bodyName, degree] of Object.entries(planets)) { vargaData[`D${v}`][bodyName] = getVargaSign(degree, v); }
         });
 
-        res.status(200).json({ success: true, vargas: vargaData });
+        const responseData = { success: true, vargas: vargaData };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -642,6 +743,13 @@ app.post('/calculate-vargas', async (req, res) => {
 app.post('/calculate-kp-ashtakavarga', async (req, res) => {
     try {
         const body = req.body;
+        const cacheKey = `kp_${JSON.stringify(body)}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
         const eph = await load();
@@ -710,7 +818,10 @@ app.post('/calculate-kp-ashtakavarga', async (req, res) => {
             }
         }
 
-        res.status(200).json({ success: true, kp_system: kpData, ashtakavarga: savPoints });
+        const responseData = { success: true, kp_system: kpData, ashtakavarga: savPoints };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -723,6 +834,12 @@ app.post('/calculate-numerology', async (req, res) => {
     try {
         const body = req.body;
         const { name, dob } = body; 
+        const cacheKey = `numerology_${name}_${dob}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
 
         const reduceToSingleDigit = (num) => {
             while (num > 9 && num !== 11 && num !== 22 && num !== 33) {
@@ -756,7 +873,10 @@ app.post('/calculate-numerology', async (req, res) => {
 
         let properties = numerologyProperties[lifePath] || numerologyProperties[1];
 
-        res.status(200).json({ success: true, life_path_number: lifePath, destiny_number: destinyNumber, lucky_color: properties.color, ruling_planet: properties.planet, lucky_gem: properties.gem });
+        const responseData = { success: true, life_path_number: lifePath, destiny_number: destinyNumber, lucky_color: properties.color, ruling_planet: properties.planet, lucky_gem: properties.gem };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -773,6 +893,13 @@ app.post('/daily-horoscope', async (req, res) => {
         const now = new Date();
         const currentYear = now.getUTCFullYear(), currentMonth = now.getUTCMonth() + 1;
         const currentDay = now.getUTCDate(), currentHour = now.getUTCHours() + (now.getUTCMinutes() / 60.0);
+
+        const cacheKey = `daily_horoscope_${year}_${month}_${day}_${hour}_${min}_${currentYear}_${currentMonth}_${currentDay}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
 
         const eph = await load();
         let floatHour = hour + (min / 60.0) - 5.5;
@@ -809,7 +936,10 @@ app.post('/daily-horoscope', async (req, res) => {
             nadi_key: `nadi_${nadis[natalNakshatra % 3]}`, element_key: `element_${elements[natalNakshatra % 5]}`
         };
 
-        res.status(200).json({ success: true, natal_info: nakshatraData, daily_transit: { transit_moon_rasi: transitRasi, transit_nakshatra: transitNakshatra, tarabalam_index: tarabalam, chandrabalam_index: chandrabalam, is_auspicious_day: isGoodDay } });
+        const responseData = { success: true, natal_info: nakshatraData, daily_transit: { transit_moon_rasi: transitRasi, transit_nakshatra: transitNakshatra, tarabalam_index: tarabalam, chandrabalam_index: chandrabalam, is_auspicious_day: isGoodDay } };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -822,6 +952,12 @@ app.post('/premium-alerts', async (req, res) => {
     try {
         const body = req.body;
         const { year, month, day, hour, min, lat, lon } = body;
+        const cacheKey = `premium_alerts_${year}_${month}_${day}_${hour}_${min}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
 
         const eph = await load();
         let floatHour = hour + (min / 60.0) - 5.5;
@@ -866,16 +1002,14 @@ app.post('/premium-alerts', async (req, res) => {
         for (let i = 0; i < 7; i++) { if (todaysHoras[i] === "Jupiter" || todaysHoras[i] === "Venus") { bestHoraIndex = i; break; } }
         let goldenHourStart = 6 + bestHoraIndex; 
         
-        res.status(200).json({ success: true, golden_hour: { start_hour: goldenHourStart, end_hour: goldenHourStart + 1, planet: todaysHoras[bestHoraIndex] }, transits: transitAlerts, target_date: `${tYear}-${tMonth}-${tDay}` });
+        const responseData = { success: true, golden_hour: { start_hour: goldenHourStart, end_hour: goldenHourStart + 1, planet: todaysHoras[bestHoraIndex] }, transits: transitAlerts, target_date: `${tYear}-${tMonth}-${tDay}` };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
-
-// ==========================================
-// 12. Advanced Pan-India Panchang & Festival API
-// ==========================================
-
 
 // ==========================================
 // 13. SHASTRA OMENS (ഗൗളി, സ്വപ്നം, ശകുനം, തുമ്മൽ, കാക്ക)
@@ -883,8 +1017,13 @@ app.post('/premium-alerts', async (req, res) => {
 app.get('/get-shastra-omens', (req, res) => {
     try {
         const lang = req.query.lang || "ml";
+        const cacheKey = `shastras_${lang}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
         
-        // Comprehensive Dictionary of Omens in Malayalam & English
         const omensData = {
             "gowli_shastra": {
                 "category_ml": "ഗൗളീശാസ്ത്രം (പല്ലി വീഴുന്ന ഫലം)",
@@ -952,7 +1091,6 @@ app.get('/get-shastra-omens', (req, res) => {
             }
         };
 
-        // ഭാഷയ്ക്ക് അനുസരിച്ച് ഡാറ്റ ഫിൽറ്റർ ചെയ്യുന്നു
         const formattedData = Object.keys(omensData).map(key => {
             const shastra = omensData[key];
             return {
@@ -966,7 +1104,10 @@ app.get('/get-shastra-omens', (req, res) => {
             };
         });
 
-        res.status(200).json({ success: true, shastras: formattedData });
+        const responseData = { success: true, shastras: formattedData };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -978,13 +1119,18 @@ app.get('/get-shastra-omens', (req, res) => {
 app.post('/calculate-next-bali', async (req, res) => {
     try {
         const body = req.body;
-        // 'solar' (Kerala/TN) അല്ലെങ്കിൽ 'lunar' (North India/Karnataka)
         const method = body.calculation_method || 'solar'; 
+        const cacheKey = `bali_${body.death_year}_${body.death_month}_${body.death_day}_${method}`;
+        
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
         
         const eph = await load();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
-        // 1. മരണ സമയത്തെ വിവരങ്ങൾ (12:00 PM IST സമയമെടുക്കുന്നു)
         const dJd = eph.swe_julday(body.death_year, body.death_month, body.death_day, 6.5, Constants.SE_GREG_CAL);
         const dAyanamsa = eph.swe_get_ayanamsa_ut(dJd);
         const dSun = (eph.swe_calc_ut(dJd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - dAyanamsa + 360) % 360;
@@ -992,9 +1138,8 @@ app.post('/calculate-next-bali', async (req, res) => {
 
         const dDiff = (dMoon - dSun + 360) % 360;
         const targetTithi = Math.floor(dDiff / 12);
-        const targetSunRasi = Math.floor(dSun / 30); // സൗരമാന മാസം
+        const targetSunRasi = Math.floor(dSun / 30); 
 
-        // ചന്ദ്രമാസം (Lunar Month) കണ്ടുപിടിക്കാനുള്ള ഫംഗ്ഷൻ (അമാവാസി അടിസ്ഥാനമാക്കി)
         const getLunarMonth = (jd, tithiIndex) => {
             let approxAmavasyaJd = jd - (tithiIndex * 0.9843);
             let aAyanamsa = eph.swe_get_ayanamsa_ut(approxAmavasyaJd);
@@ -1002,9 +1147,8 @@ app.post('/calculate-next-bali', async (req, res) => {
             return Math.floor(aSun / 30);
         };
 
-        const targetLunarMonth = getLunarMonth(dJd, targetTithi); // ചന്ദ്രമാന മാസം
+        const targetLunarMonth = getLunarMonth(dJd, targetTithi); 
 
-        // 2. ഇന്നത്തെ ദിവസത്തിന് ശേഷം വരുന്ന അടുത്ത ബലി തീയതി കണ്ടുപിടിക്കുന്നു
         const today = new Date();
         let currentYear = today.getFullYear();
         let foundDate = null;
@@ -1014,7 +1158,6 @@ app.post('/calculate-next-bali', async (req, res) => {
             if(startMonth < 1) startMonth = 1;
             let startDate = new Date(year, startMonth - 1, 1);
             
-            // ഏകദേശം 120 ദിവസത്തെ ലൂപ്പ്
             for (let i = 0; i < 120; i++) { 
                 let checkDate = new Date(startDate.getTime() + (i * 86400000));
                 
@@ -1031,14 +1174,12 @@ app.post('/calculate-next-bali', async (req, res) => {
                 let cTithi = Math.floor(cDiff / 12);
 
                 if (method === 'solar') {
-                    // കേരളം/തമിഴ്നാട് രീതി (സൂര്യ രാശി + തിഥി)
                     let cSunRasi = Math.floor(cSun / 30);
                     if (cSunRasi === targetSunRasi && cTithi === targetTithi) {
                         foundDate = checkDate;
                         break;
                     }
                 } else {
-                    // ഉത്തരേന്ത്യൻ രീതി (ചന്ദ്രമാസം + തിഥി)
                     let cLunarMonth = getLunarMonth(cJd, cTithi);
                     if (cLunarMonth === targetLunarMonth && cTithi === targetTithi) {
                         foundDate = checkDate;
@@ -1049,12 +1190,16 @@ app.post('/calculate-next-bali', async (req, res) => {
             if (foundDate) break;
         }
 
-        res.status(200).json({
+        const responseData = {
             success: true,
             target_tithi_index: targetTithi,
             calculation_method: method,
             next_bali_date: foundDate ? foundDate.toISOString().split('T')[0] : null
-        });
+        };
+
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -1066,13 +1211,19 @@ app.post('/calculate-next-bali', async (req, res) => {
 app.post('/calculate-yearly-festivals', async (req, res) => {
     try {
         const { year } = req.body;
+        const cacheKey = `festivals_${year}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         const eph = await load();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
         let festivals = [];
         let oneTimeEvents = { vishu: false, makarSankranti: false };
 
-        // ജനുവരി 1 മുതൽ ഡിസംബർ 31 വരെ ഓരോ ദിവസവും ലൂപ്പ് ചെയ്യുന്നു
         let startDate = new Date(year, 0, 1);
         for (let i = 0; i < 366; i++) {
             let checkDate = new Date(startDate.getTime() + (i * 86400000));
@@ -1084,20 +1235,17 @@ app.post('/calculate-yearly-festivals', async (req, res) => {
             let sunDeg = (eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
             let moonDeg = (eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
 
-            let sunRasi = Math.floor(sunDeg / 30); // 0=മേടം, 1=ഇടവം, ..., 4=ചിങ്ങം, ..., 11=മീനം
-            let nakshatra = Math.floor(moonDeg / (360 / 27)); // 21=തിരുവോണം, 3=രോഹിണി, 10=പൂരം
-            let tithi = Math.floor(((moonDeg - sunDeg + 360) % 360) / 12); // 0-14 ശുക്ലപക്ഷം, 15-29 കൃഷ്ണപക്ഷം (14=പൗർണ്ണമി, 29=അമാവാസി)
+            let sunRasi = Math.floor(sunDeg / 30); 
+            let nakshatra = Math.floor(moonDeg / (360 / 27)); 
+            let tithi = Math.floor(((moonDeg - sunDeg + 360) % 360) / 12); 
 
             let dateString = checkDate.toISOString().split('T')[0];
 
-            // Helper function to add festival
             const addF = (ml, en, icon, color) => {
                 festivals.push({ name_ml: ml, name_en: en, date: dateString, icon: icon, color_hex: color });
             };
 
-            // =====================================
             // 🌸 കേരളത്തിലെ പ്രധാന ആഘോഷങ്ങൾ 🌸
-            // =====================================
             if (sunRasi === 4 && nakshatra === 21) addF("തിരുവോണം", "Thiruvonam", "🌸", "0xFF4CAF50");
             if (sunRasi === 0 && !oneTimeEvents.vishu) { addF("വിഷു", "Vishu", "🎆", "0xFFFF9800"); oneTimeEvents.vishu = true; }
             if (sunRasi === 4 && tithi === 22 && nakshatra === 3) addF("ശ്രീകൃഷ്ണ ജയന്തി (അഷ്ടമി രോഹിണി)", "Sree Krishna Jayanthi", "🦚", "0xFF00BCD4");
@@ -1108,9 +1256,7 @@ app.post('/calculate-yearly-festivals', async (req, res) => {
             if (sunRasi === 4 && nakshatra === 23) addF("ശ്രീനാരായണ ഗുരു ജയന്തി", "Sree Narayana Guru Jayanthi", "✨", "0xFFFFD700");
             if (sunRasi === 5 && nakshatra === 23) addF("ശ്രീനാരായണ ഗുരു സമാധി", "Sree Narayana Guru Samadhi", "🕊️", "0xFFBDBDBD");
 
-            // =====================================
             // 🪔 പാൻ-ഇന്ത്യൻ (Pan-Indian) ആഘോഷങ്ങൾ 🪔
-            // =====================================
             if (sunRasi === 6 && tithi === 29) addF("ദീപാവലി", "Diwali", "🪔", "0xFFF44336");
             if ((sunRasi === 10 || sunRasi === 11) && tithi === 28) addF("മഹാശിവരാത്രി", "Maha Shivaratri", "🔱", "0xFF3F51B5");
             if (sunRasi === 4 && tithi === 3) addF("വിനായക ചതുർത്ഥി", "Ganesha Chaturthi", "🐘", "0xFFFFC107");
@@ -1128,17 +1274,16 @@ app.post('/calculate-yearly-festivals', async (req, res) => {
             if ((sunRasi === 0 || sunRasi === 1) && tithi === 2) addF("അക്ഷയ തൃതീയ", "Akshaya Tritiya", "🪙", "0xFFFFD700");
             if ((sunRasi === 11 || sunRasi === 0) && tithi === 0) addF("ഉഗാദി / ഗുഡി പഡ്വ", "Ugadi / Gudi Padwa", "🌿", "0xFF8BC34A");
             
-            // കർക്കടക വാവ് (കർക്കടക മാസത്തിലെ അമാവാസി)
             if (sunRasi === 3 && tithi === 29) addF("കർക്കടക വാവ് ബലി", "Karkidaka Vavu Bali", "🌾", "0xFF795548");
         }
 
-        // തീയതി അനുസരിച്ച് ക്രമീകരിക്കുക
         festivals.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        // ഡ്യൂപ്ലിക്കേറ്റുകൾ ഒഴിവാക്കാൻ
         let uniqueFestivals = festivals.filter((v, i, a) => a.findIndex(t => (t.name_ml === v.name_ml && t.date === v.date)) === i);
 
-        res.status(200).json({ success: true, year: year, count: uniqueFestivals.length, festivals: uniqueFestivals });
+        const responseData = { success: true, year: year, count: uniqueFestivals.length, festivals: uniqueFestivals };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
@@ -1149,10 +1294,18 @@ app.post('/calculate-yearly-festivals', async (req, res) => {
 // ==========================================
 app.post('/calculate-upcoming-vrathams', async (req, res) => {
     try {
+        const today = new Date();
+        const dateStrToday = today.toISOString().split('T')[0];
+        const cacheKey = `vrathams_${dateStrToday}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
         const eph = await load();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
-        let today = new Date();
         let vrathamDates = {
             "ekadashi": null, "pradosham": null, "shashti": null,
             "chaturthi": null, "pournami": null, "amavasya": null,
@@ -1160,11 +1313,9 @@ app.post('/calculate-upcoming-vrathams', async (req, res) => {
             "velliyazhcha": null, "vyazhazhcha": null, "shaniyazhcha": null
         };
 
-        // അടുത്ത 35 ദിവസത്തേക്ക് തിഥിയും ആഴ്ചയും പരിശോധിക്കുന്നു
         for (let i = 0; i <= 35; i++) {
             let checkDate = new Date(today.getTime() + (i * 86400000));
             
-            // 6:00 AM IST = 0.5 UT (സൂര്യോദയ സമയത്തെ തിഥി എടുക്കാൻ)
             let jd = eph.swe_julday(checkDate.getFullYear(), checkDate.getMonth() + 1, checkDate.getDate(), 0.5, Constants.SE_GREG_CAL);
             let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
 
@@ -1175,16 +1326,14 @@ app.post('/calculate-upcoming-vrathams', async (req, res) => {
             let dayOfWeek = checkDate.getDay(); 
             let dateStr = checkDate.toISOString().split('T')[0];
 
-            // തിഥികൾ അടിസ്ഥാനമാക്കിയുള്ളവ (ഏറ്റവും ആദ്യം വരുന്ന തിയതി മാത്രം സേവ് ചെയ്യുന്നു)
             if ((tithi === 10 || tithi === 25) && !vrathamDates.ekadashi) vrathamDates.ekadashi = dateStr;
             if ((tithi === 12 || tithi === 27) && !vrathamDates.pradosham) vrathamDates.pradosham = dateStr;
             if ((tithi === 5 || tithi === 20) && !vrathamDates.shashti) vrathamDates.shashti = dateStr;
             if ((tithi === 3 || tithi === 18) && !vrathamDates.chaturthi) vrathamDates.chaturthi = dateStr;
             if (tithi === 14 && !vrathamDates.pournami) vrathamDates.pournami = dateStr;
             if (tithi === 29 && !vrathamDates.amavasya) vrathamDates.amavasya = dateStr;
-            if (tithi === 28 && !vrathamDates.shivaratri) vrathamDates.shivaratri = dateStr; // കൃഷ്ണ ചതുർദ്ദശി
+            if (tithi === 28 && !vrathamDates.shivaratri) vrathamDates.shivaratri = dateStr; 
 
-            // ആഴ്ചകൾ അടിസ്ഥാനമാക്കിയുള്ളവ
             if (dayOfWeek === 1 && !vrathamDates.somavaram) vrathamDates.somavaram = dateStr;
             if (dayOfWeek === 2 && !vrathamDates.chovvazhcha) vrathamDates.chovvazhcha = dateStr;
             if (dayOfWeek === 4 && !vrathamDates.vyazhazhcha) vrathamDates.vyazhazhcha = dateStr;
@@ -1192,13 +1341,14 @@ app.post('/calculate-upcoming-vrathams', async (req, res) => {
             if (dayOfWeek === 6 && !vrathamDates.shaniyazhcha) vrathamDates.shaniyazhcha = dateStr;
         }
 
-        res.status(200).json({ success: true, next_dates: vrathamDates });
+        const responseData = { success: true, next_dates: vrathamDates };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
-
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
