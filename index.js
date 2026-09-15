@@ -122,6 +122,69 @@ app.post('/generate-horoscope', async (req, res) => {
 
 // ==========================================
 // 2. പഞ്ചാംഗം & കൃത്യമായ അവസാന സമയം (Exact End Timings)
+
+// ==========================================
+// 18. മുഹൂർത്തങ്ങൾ കണ്ടുപിടിക്കാനുള്ള API (Get Muhurats API)
+// ==========================================
+app.post('/get-muhurats', async (req, res) => {
+    try {
+        const { category, year, month, lang } = req.body;
+        const cacheKey = `muhurats_${category}_${year}_${month}_${lang || 'ml'}`;
+        
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
+        const eph = await load();
+        eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
+
+        let muhurats = [];
+        let daysInMonth = new Date(year, month, 0).getDate();
+
+        // മാസം മുഴുവനുള്ള ദിവസങ്ങൾ പരിശോധിച്ച് മുഹൂർത്തങ്ങൾ കണക്കാക്കുന്നു
+        for (let day = 1; day <= daysInMonth; day++) {
+            let jd = eph.swe_julday(year, month, day, 6.5, Constants.SE_GREG_CAL);
+            let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
+
+            let sunPos = eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH);
+            let moonPos = eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH);
+            let sunDeg = (sunPos.xx[0] - ayanamsa + 360) % 360;
+            let moonDeg = (moonPos.xx[0] - ayanamsa + 360) % 360;
+
+            let diff = (moonDeg - sunDeg + 360) % 360;
+            let tithiIndex = Math.floor(diff / 12);
+            let nakshatraIndex = Math.floor(moonDeg / (360 / 27));
+
+            // മുഹൂർത്തത്തിന് അനുയോജ്യമായ ശുഭ തിഥികളും നക്ഷത്രങ്ങളും
+            const auspiciousTithis = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13];
+            const auspiciousNakshatras = [0, 3, 4, 6, 7, 9, 11, 12, 13, 16, 18, 21, 26]; // അശ്വതി, രോഹിണി, മൃഗശിര, പുണർതം, പൂയം, മകം, ഉത്രം മുതലായവ
+
+            if (auspiciousTithis.includes(tithiIndex % 15) && auspiciousNakshatras.includes(nakshatraIndex)) {
+                let formattedMonth = String(month).padStart(2, '0');
+                let formattedDay = String(day).padStart(2, '0');
+                
+                let scoreText = (lang === 'en') ? "Auspicious" : "ഉത്തമം";
+
+                muhurats.push({
+                    date: `${year}-${formattedMonth}-${formattedDay}`,
+                    time: "09:15 AM - 10:45 AM",
+                    nakshatra: `Nakshatra ID: ${nakshatraIndex + 1}`,
+                    tithi: `Tithi ID: ${tithiIndex + 1}`,
+                    score: scoreText
+                });
+            }
+        }
+
+        const responseData = { success: true, muhurats: muhurats };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
+    } catch (e) {
+        res.status(500).json({ error: e.message, stack: e.stack });
+    }
+});
 // ==========================================
 app.post('/get-panchangam', async (req, res) => {
     try {
