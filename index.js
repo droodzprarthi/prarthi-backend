@@ -120,6 +120,62 @@ app.post('/generate-horoscope', async (req, res) => {
     }
 });
 
+
+// ==========================================
+// 18. Monthly Calendar Data API (For Grid UI)
+// ==========================================
+app.post('/monthly-calendar', async (req, res) => {
+    try {
+        const { year, month, lat, lon, tradition } = req.body;
+        const cacheKey = `monthly_calendar_${year}_${month}_${tradition}`;
+        const cached = getCachedResponse(cacheKey);
+        if (cached) {
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.status(200).json(cached);
+        }
+
+        const eph = await load();
+        eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
+
+        const nakshatraNamesML = ["അശ്വതി", "ഭരണി", "കാർത്തിക", "രോഹിണി", "മകയിരം", "തിരുവാതിര", "പുണർതം", "പൂയം", "ആയില്യം", "മകം", "പൂരം", "ഉത്രം", "അത്തം", "ചിത്തിര", "ചോതി", "വിശാഖം", "അനിഴം", "തൃക്കേട്ട", "മൂലം", "പൂരാടം", "ഉത്രാടം", "തിരുവോണം", "അവിട്ടം", "ചതയം", "പൂരുരുട്ടാതി", "ഉത്തൃട്ടാതി", "രേവതി"];
+        const rasiNamesML = ["മേടം", "ഇടവം", "മിഥുനം", "കർക്കടകം", "ചിങ്ങം", "കന്നി", "തുലാം", "വൃശ്ചികം", "ധനു", "മകരം", "കുംഭം", "മീനം"];
+
+        let regionalDates = {};
+        let nakshatras = {};
+        let events = []; // നിങ്ങൾക്ക് വേണമെങ്കിൽ '/calculate-yearly-festivals' ലെ ലോജിക് ഇവിടെയും വിളിക്കാം
+
+        // ഒരു മാസത്തിൽ എത്ര ദിവസമുണ്ടെന്ന് കണ്ടുപിടിക്കുന്നു
+        let daysInMonth = new Date(year, month, 0).getDate();
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            let dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+            
+            // ഉച്ചയ്ക്ക് 12 മണിക്കുള്ള (6.5 UTC) ഗ്രഹങ്ങളുടെ സ്ഥാനം കണക്കാക്കുന്നു
+            let jd = eph.swe_julday(year, month, day, 6.5, Constants.SE_GREG_CAL); 
+            let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
+            
+            let moonDeg = (eph.swe_calc_ut(jd, Constants.SE_MOON, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
+            let sunDeg = (eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
+
+            // നക്ഷത്രം കണ്ടുപിടിക്കുന്നു (ചന്ദ്രന്റെ ഡിഗ്രി ഉപയോഗിച്ച്)
+            let nakshatraIndex = Math.floor(moonDeg / (360 / 27));
+            nakshatras[dateStr] = nakshatraNamesML[nakshatraIndex];
+
+            // മലയാളം മാസം തീയതി (സൂര്യന്റെ രാശി ഉപയോഗിച്ച്)
+            let sunRasi = Math.floor(sunDeg / 30);
+            let dayInSolarMonth = Math.floor(sunDeg % 30) + 1; // ഡിഗ്രിയെ ഏകദേശം തീയതിയാക്കി മാറ്റുന്നു
+            regionalDates[dateStr] = `${rasiNamesML[sunRasi]} ${dayInSolarMonth}`;
+        }
+
+        const responseData = { success: true, events, regional_dates: regionalDates, nakshatras };
+        setCachedResponse(cacheKey, responseData);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.status(200).json(responseData);
+    } catch (e) {
+        res.status(500).json({ error: e.message, stack: e.stack });
+    }
+});
+
 // ==========================================
 // 2. പഞ്ചാംഗം & കൃത്യമായ അവസാന സമയം (Exact End Timings)
 
