@@ -510,11 +510,15 @@ app.post('/calculate-porutham', async (req, res) => {
         else if (Math.abs(papaDiff) < 5) papasamyamMatch = "Good";
         else papasamyamMatch = "Bad"; 
 
+        // ... (മുകളിലത്തെ കോഡുകൾ മാറ്റമില്ല)
+
         let manglikMatch = (boy.is_manglik === girl.is_manglik);
         let sarpaDoshaMatch = (boy.has_sarpa_dosham === girl.has_sarpa_dosham);
 
         const responseData = { 
             success: true, 
+            boy: boy,   // 🌟 ഈ വരി പുതിയതായി ചേർക്കുക (ഇതാണ് ആപ്പിലെ എറർ മാറ്റുന്നത്)
+            girl: girl, // 🌟 ഈ വരി പുതിയതായി ചേർക്കുക (ഇതാണ് ആപ്പിലെ എറർ മാറ്റുന്നത്)
             kerala_10_porutham: { 
                 score: `${tenPoruthamScore}/10`, 
                 dinam, ganam, yoni, rasi, rajju, mahendram, stree_dheergham: streeDheergham,
