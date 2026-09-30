@@ -9,6 +9,7 @@ app.use(express.json());
 // ==========================================
 // 🚀 IN-MEMORY CACHE ENGINE (POST & GET Caching)
 // സെർവർ ലോഡ് കുറയ്ക്കാനും സ്പീഡ് കൂട്ടാനുമുള്ള കാഷ് സിസ്റ്റം
+// പൊതുവായ ഡാറ്റയ്ക്ക് (Calendar, Festivals) മാത്രം ഇത് ഉപയോഗിക്കുക.
 // ==========================================
 const apiCache = new Map();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 മണിക്കൂർ വാലിഡിറ്റി
@@ -60,18 +61,12 @@ app.get('/', (req, res) => {
 
 // ==========================================
 // 1. ജാതകം ഗണിക്കുന്ന ഭാഗം (Horoscope API)
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/generate-horoscope', async (req, res) => {
     try {
         const body = req.body;
-        const cacheKey = `horoscope_${body.year}_${body.month}_${body.day}_${body.hour}_${body.min}_${body.lat}_${body.lon}`;
         
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
-
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
 
         const eph = await load();
@@ -112,8 +107,6 @@ app.post('/generate-horoscope', async (req, res) => {
             nakshatra_index: nakshatraIndex 
         };
 
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
@@ -356,16 +349,11 @@ app.post('/get-panchangam', async (req, res) => {
 
 // ==========================================
 // 3. പൊരുത്തം നോക്കാനുള്ള ഭാഗം (Marriage Matching API)
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-porutham', async (req, res) => {
     try {
         const body = req.body;
-        const cacheKey = `porutham_${JSON.stringify(body)}`;
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
 
         const eph = await load();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
@@ -511,8 +499,6 @@ app.post('/calculate-porutham', async (req, res) => {
             }
         };
 
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
@@ -521,16 +507,11 @@ app.post('/calculate-porutham', async (req, res) => {
 
 // ==========================================
 // 4. സമ്പൂർണ്ണ ദോഷ നിർണ്ണയം (Manglik Dosha Fixed)
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-dosha', async (req, res) => {
     try {
         const body = req.body;
-        const cacheKey = `dosha_${JSON.stringify(body)}`;
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
 
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
@@ -612,8 +593,6 @@ app.post('/calculate-dosha', async (req, res) => {
           grahan_dosha: { has_dosha: hasGrahan }, vish_dosha: { has_dosha: hasVish }, kemadruma_dosha: { has_dosha: hasKemadruma }
         };
 
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
@@ -719,16 +698,11 @@ app.post('/calculate-muhurtha', async (req, res) => {
 
 // ==========================================
 // 6. വിംശോത്തരി ദശ
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-dasha', async (req, res) => {
     try {
         const body = req.body;
-        const cacheKey = `dasha_${JSON.stringify(body)}`;
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
 
         let floatHour = body.hour + (body.min / 60.0) - 5.5; 
 
@@ -769,8 +743,6 @@ app.post('/calculate-dasha', async (req, res) => {
         }
 
         const responseData = { success: true, balance_dasha: { lord: dashaLords[startDashaIndex], years: balanceYears }, dashas: dashaList };
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
@@ -779,16 +751,11 @@ app.post('/calculate-dasha', async (req, res) => {
 
 // ==========================================
 // 7. 16 വർഗ്ഗ ചാർട്ടുകൾ
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-vargas', async (req, res) => {
     try {
         const body = req.body;
-        const cacheKey = `vargas_${JSON.stringify(body)}`;
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
 
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
@@ -848,8 +815,6 @@ app.post('/calculate-vargas', async (req, res) => {
         });
 
         const responseData = { success: true, vargas: vargaData };
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
@@ -858,16 +823,11 @@ app.post('/calculate-vargas', async (req, res) => {
 
 // ==========================================
 // 8. KP System & Ashtakavarga API
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-kp-ashtakavarga', async (req, res) => {
     try {
         const body = req.body;
-        const cacheKey = `kp_${JSON.stringify(body)}`;
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
 
         let floatHour = body.hour + (body.min / 60.0) - 5.5;
 
@@ -938,8 +898,6 @@ app.post('/calculate-kp-ashtakavarga', async (req, res) => {
         }
 
         const responseData = { success: true, kp_system: kpData, ashtakavarga: savPoints };
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
@@ -948,17 +906,12 @@ app.post('/calculate-kp-ashtakavarga', async (req, res) => {
 
 // ==========================================
 // 9. Numerology API (Pythagorean System)
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-numerology', async (req, res) => {
     try {
         const body = req.body;
         const { name, dob } = body; 
-        const cacheKey = `numerology_${name}_${dob}`;
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
 
         const reduceToSingleDigit = (num) => {
             while (num > 9 && num !== 11 && num !== 22 && num !== 33) {
@@ -993,8 +946,6 @@ app.post('/calculate-numerology', async (req, res) => {
         let properties = numerologyProperties[lifePath] || numerologyProperties[1];
 
         const responseData = { success: true, life_path_number: lifePath, destiny_number: destinyNumber, lucky_color: properties.color, ruling_planet: properties.planet, lucky_gem: properties.gem };
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
@@ -1003,6 +954,7 @@ app.post('/calculate-numerology', async (req, res) => {
 
 // ==========================================
 // 10. Daily Horoscope, Gocharam & Nakshatra Details API
+// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/daily-horoscope', async (req, res) => {
     try {
@@ -1012,13 +964,6 @@ app.post('/daily-horoscope', async (req, res) => {
         const now = new Date();
         const currentYear = now.getUTCFullYear(), currentMonth = now.getUTCMonth() + 1;
         const currentDay = now.getUTCDate(), currentHour = now.getUTCHours() + (now.getUTCMinutes() / 60.0);
-
-        const cacheKey = `daily_horoscope_${year}_${month}_${day}_${hour}_${min}_${currentYear}_${currentMonth}_${currentDay}`;
-        const cached = getCachedResponse(cacheKey);
-        if (cached) {
-            res.set('Cache-Control', 'public, max-age=86400');
-            return res.status(200).json(cached);
-        }
 
         const eph = await load();
         let floatHour = hour + (min / 60.0) - 5.5;
@@ -1056,8 +1001,6 @@ app.post('/daily-horoscope', async (req, res) => {
         };
 
         const responseData = { success: true, natal_info: nakshatraData, daily_transit: { transit_moon_rasi: transitRasi, transit_nakshatra: transitNakshatra, tarabalam_index: tarabalam, chandrabalam_index: chandrabalam, is_auspicious_day: isGoodDay } };
-        setCachedResponse(cacheKey, responseData);
-        res.set('Cache-Control', 'public, max-age=86400');
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
