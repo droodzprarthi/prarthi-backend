@@ -114,12 +114,14 @@ app.post('/generate-horoscope', async (req, res) => {
 });
 
 
+// ==========================================
+// 18. Monthly Calendar Data API (For Grid UI) - FULLY FIXED
+// ==========================================
 app.post('/monthly-calendar', async (req, res) => {
     try {
         const { year, month, lat, lon, tradition, lang } = req.body;
         
         const reqLang = lang || 'ml'; 
-        // 🌟 പഴയ തെറ്റായ ഡാറ്റ വരാതിരിക്കാൻ cacheKey യിൽ 'v2' എന്ന് ചേർത്തിട്ടുണ്ട്
         const cacheKey = `monthly_calendar_v2_${year}_${month}_${tradition}_${reqLang}`;
         
         const cached = getCachedResponse(cacheKey);
@@ -131,7 +133,60 @@ app.post('/monthly-calendar', async (req, res) => {
         const eph = await load();
         eph.swe_set_sid_mode(Constants.SE_SIDM_LAHIRI, 0, 0);
 
-        // ... (നിങ്ങളുടെ പഴയ nakshatrasDict, solarMonths, lunarMonths ഇവിടെ മാറ്റമില്ലാതെ നൽകുക) ...
+        const nakshatrasDict = {
+            'ml': ["അശ്വതി", "ഭരണി", "കാർത്തിക", "രോഹിണി", "മകയിരം", "തിരുവാതിര", "പുണർതം", "പൂയം", "ആയില്യം", "മകം", "പൂരം", "ഉത്രം", "അത്തം", "ചിത്തിര", "ചോതി", "വിശാഖം", "അനിഴം", "തൃക്കേട്ട", "മൂലം", "പൂരാടം", "ഉത്രാടം", "തിരുവോണം", "അവിട്ടം", "ചതയം", "പൂരുരുട്ടാതി", "ഉത്തൃട്ടാതി", "രേവതി"],
+            'ta': ["அஸ்வினி", "பரணி", "கார்த்திகை", "ரோகிணி", "மிருகசீரிடம்", "திருவாதிரை", "புனர்பூசம்", "பூசம்", "ஆயில்யம்", "மகம்", "பூரம்", "உத்திரம்", "அஸ்தம்", "சித்திரை", "சுவாதி", "விசாகம்", "அனுஷம்", "கேட்டை", "மூலம்", "பூராடம்", "உத்திராடம்", "திருவோணம்", "அவிட்டம்", "சதயம்", "பூரட்டாதி", "உத்திரட்டாதி", "ரேவதி"],
+            'hi': ["अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशिरा", "आर्द्रा", "पुनर्वसु", "पुष्य", "अश्लेषा", "मघा", "पूर्वाफाल्गुनी", "उत्तराफाल्गुनी", "हस्त", "चित्रा", "स्वाती", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूल", "पूर्वाषाढा", "उत्तराषाढा", "श्रवण", "धनिष्ठा", "शतभिषा", "पूर्वाभाद्रपद", "उत्तराभाद्रपद", "रेवती"],
+            'te': ["అశ్విని", "భరణి", "కృత్తిక", "రోహిణి", "మృగశిర", "ఆర్ద్ర", "పునర్వసు", "పుష్యమి", "ఆశ్లేష", "మఖ", "పూర్వ ఫల్గుణి", "ఉత్తర ఫల్గుణి", "హస్త", "చిత్ర", "స్వాతి", "విశాఖ", "అనురాధ", "జ్యేష్ఠ", "మూల", "పూర్వాషాఢ", "ఉత్తరాషాఢ", "శ్రవణం", "ధనిష్ఠ", "శతభిషం", "పూర్వాభాద్ర", "ఉత్తరాభాద్ర", "రేవతి"],
+            'kn': ["ಅಶ್ವಿನಿ", "ಭರಣಿ", "ಕೃತ್ತಿಕಾ", "ರೋಹಿಣಿ", "ಮೃಗಶಿರ", "ಆದ್ರ", "ಪುನರ್ವಸು", "ಪುಷ್ಯ", "ಆಶ್ಲೇಷ", "ಮಘ", "ಪೂರ್ವ ಫಾಲ್ಗುಣಿ", "ಉತ್ತರ ಫಾಲ್ಗುಣಿ", "ಹಸ್ತ", "ಚಿತ್ರಾ", "ಸ್ವಾತಿ", "ವಿಶಾಖ", "ಅನುರಾಧ", "ಜ್ಯೇಷ್ಠ", "ಮೂಲ", "ಪೂರ್ವಾಷಾಢ", "ಉತ್ತರಾಷಾಢ", "ಶ್ರವಣ", "ಧನಿಷ್ಠ", "ಶತಭಿಷ", "ಪೂರ್ವಭಾದ್ರ", "ಉತ್ತರಭಾದ್ರ", "ರೇವತಿ"],
+            'bn': ["অশ্বিনী", "ভরণী", "কৃত্তিকা", "রোহিণী", "মৃগশিরা", "আর্দ্রা", "পুনর্বসু", "পুষ্যা", "অশ্লেষা", "মঘা", "পূর্ব ফাল্গুনী", "উত্তর ফাল্গুনী", "হস্তা", "চিত্রা", "স্বাতী", "বিশাখা", "অনুরাধা", "জ্যেষ্ঠা", "মূলা", "পূর্বাষাঢ়া", "উত্তরাষাঢ়া", "শ্রবণা", "ধনিষ্ঠা", "শতভিষা", "পূর্ব ভাদ্রপদ", "উত্তর ভাদ্রপদ", "রেবতী"],
+            'gu': ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશિરા", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ઠા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"],
+            'or': ["ଅଶ୍ୱିନୀ", "ଭରଣୀ", "କୃତ୍ତିକା", "ରୋହିଣୀ", "ମୃଗଶିରା", "ଆର୍ଦ୍ରା", "ପୁନର୍ବସୁ", "ପୁଷ୍ୟା", "ଅଶ୍ଳେଷା", "ମଘା", "ପୂର୍ବ ଫାଲ୍ଗୁନୀ", "ଉତ୍ତର ଫାଲ୍ଗୁନୀ", "ହସ୍ତା", "ଚିତ୍ରା", "ସ୍ୱାତୀ", "ବିଶାଖା", "ଅନୁରାଧା", "ଜ୍ୟେଷ୍ଠା", "ମୂଳା", "ପୂର୍ବାଷାଢ଼ା", "ଉତ୍ତରାଷାଢ଼ା", "ଶ୍ରବଣା", "ଧନିଷ୍ଠା", "ଶତଭିଷା", "ପୂର୍ବ ଭାଦ୍ରପଦ", "ଉତ୍ତର ଭାଦ୍ରପଦ", "ରେବତୀ"],
+            'pa': ["ਅਸ਼ਵਿਨੀ", "ਭਰਣੀ", "ਕ੍ਰਿਤਿਕਾ", "ਰੋਹਿਣੀ", "ਮ੍ਰਿਗਸ਼ਿਰਾ", "ਆਰਦਰਾ", "ਪੁਨਰਵਸੁ", "ਪੁਸ਼ਯਾ", "ਅਸ਼ਲੇਸ਼ਾ", "ਮਘા", "ਪੂਰਵਾ ਫਾਲਗੁਨੀ", "ਉੱਤਰਾ ਫਾਲਗੁਨੀ", "ਹਸਤ", "ਚਿਤ੍ਰਾ", "ਸਵਾਤੀ", "ਵਿਸ਼ਾਖਾ", "ਅਨੁਰਾਧਾ", "ਜਯੇਸ਼ਠਾ", "ਮੂਲਾ", "ਪੂਰਵਾਸ਼ਾੜਾ", "ਉੱਤਰਾਸ਼ਾੜਾ", "ਸ਼੍ਰਵਣ", "ਧਨਿਸ਼ਠਾ", "ਸ਼ਤਭਿਸ਼ਾ", "ਪੂਰਵਾ ਭਾਦਰਪਦ", "ਉੱਤਰਾ ਭਾਦਰਪਦ", "ਰੇਵਤੀ"],
+            'en': ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Moola", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
+        };
+
+        const solarMonths = {
+            'ml': ["മേടം", "ഇടവം", "മിഥുനം", "കർക്കടകം", "ചിങ്ങം", "കന്നി", "തുലാം", "വൃശ്ചികം", "ധനു", "മകരം", "കുംഭം", "മീനം"],
+            'ta': ["சித்திரை", "வைகாசி", "ஆனி", "ஆடி", "ஆவணி", "புரட்டாசி", "ஐப்பசி", "கார்த்திகை", "மார்கழி", "தை", "மாசி", "பங்குனி"],
+            'bn': ["বৈশাখ", "জ্যৈষ্ঠ", "আষাঢ়", "শ্রাবণ", "ভাদ্র", "আশ্বিন", "কার্তিক", "অগ্রহায়ণ", "পৌষ", "মাঘ", "ফাল্গুন", "চৈত্র"],
+            'or': ["ବୈଶାଖ", "ଜ୍ୟୈଷ୍ଠ", "ଆଷାଢ଼", "ଶ୍ରାବଣ", "ଭାଦ୍ରବ", "ଆଶ୍ୱିନ", "କାର୍ତ୍ତିକ", "ମାର୍ଗଶିର", "ପୌଷ", "ମାଘ", "ଫାଲ୍ଗୁନ", "ଚୈତ୍ର"],
+            'as': ["ব'হাগ", "জেঠ", "আহাৰ", "শাওন", "ভাদ", "আহিন", "কাতি", "আঘোণ", "পুহ", "মাঘ", "ফাগুন", "চ'ত"],
+            'pa': ["ਵੈਸਾਖ", "ਜੇਠ", "ਹਾੜ", "ਸਾਵਣ", "ਭਾਦੋਂ", "ਅੱਸੂ", "ਕੱਤਕ", "ਮੱਘਰ", "ਪੋਹ", "ਮਾਘ", "ਫੱਗਣ", "ਚੇਤ"],
+            'ne': ["बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"],
+            'en': ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+        };
+
+        const lunarMonths = {
+            'hi': ["चैत्र", "वैशाख", "ज्येष्ठ", "आषाढ़", "श्रावण", "भाद्रपद", "आश्विन", "कार्तिक", "मार्गशीर्ष", "पौष", "माघ", "फाल्गुन"],
+            'te': ["చైత్రము", "వైశాఖము", "జ్యేష్ఠము", "ఆషాఢము", "శ్రావణము", "భాద్రపదము", "ఆశ్వయుజము", "కార్తీకము", "మార్గశిరము", "పుష్యము", "మాఘము", "ఫాల్గుణము"],
+            'kn': ["ಚೈತ್ರ", "ವೈಶಾಖ", "ಜ್ಯೇಷ್ಠ", "ಆಷಾಢ", "ಶ್ರಾವಣ", "ಭಾದ್ರಪದ", "ಆಶ್ವಯುಜ", "ಕಾರ್ತಿಕ", "ಮಾರ್ಗಶಿರ", "ಪುಷ್ಯ", "ಮಾಘ", "ಫಾಲ್ಗುಣ"],
+            'gu': ["ચૈત્ર", "વૈશાખ", "જ્યેષ્ઠ", "અષાઢ", "શ્રાવણ", "ભાદરવો", "આસો", "કારતક", "માગશર", "પોષ", "મહા", "ફાગણ"],
+            'mr': ["चैत्र", "वैशाख", "ज्येष्ठ", "आषाढ", "श्रावण", "भाद्रपद", "अश्विन", "कार्तिक", "मार्गशीर्ष", "पौष", "माघ", "फाल्गुन"],
+            'kok': ["चैत्र", "वैशाख", "ज्येष्ठ", "आषाढ", "श्रावण", "भाद्रपद", "अश्विन", "कार्तिक", "मार्गशीर्ष", "पौष", "माघ", "फाल्गुन"],
+            'ks': ["चैत्र", "वैशाख", "ज्येष्ठ", "आषाढ़", "श्रावण", "भाद्रपद", "आश्विन", "कार्तिक", "मार्गशीर्ष", "पौष", "माघ", "फाल्गुन"], 
+            'mni': ["ꯆꯩꯠꯔꯥ", "ꯕꯩꯁꯥꯈ", "ꯖꯦꯁ꯭ꯊꯥ", "ꯑꯥꯁꯥꯔ", "ꯁ꯭ꯔꯥꯕꯟ", "ꯚꯥꯗ꯭ꯔꯥ", "ꯑꯥꯁ꯭ꯕꯤꯟ", "ꯀꯥꯔꯇꯤꯛ", "ꯑꯒ꯭ꯔꯍꯥꯌꯟ", "ꯄꯧꯁ", "ꯃꯥꯘ", "ꯐꯥꯂꯒꯨꯟ"],
+            'sd': ["چيٽ", "ويساک", "ڄيٺ", "آکاڙ", "ساوڻ", "بڊو", "اسو", "ڪتي", "ناھري", "پوھ", "مانگھ", "ڦڳڻ"],
+            'en': ["Chaitra", "Vaishakha", "Jyeshtha", "Ashadha", "Shravana", "Bhadrapada", "Ashvin", "Kartika", "Margashirsha", "Pausha", "Magha", "Phalguna"]
+        };
+
+        let activeNakshatraList = nakshatrasDict[reqLang] || nakshatrasDict['en'];
+        if (!nakshatrasDict[reqLang]) {
+             if (['mr', 'kok', 'ks', 'ne'].includes(reqLang)) activeNakshatraList = nakshatrasDict['hi'];
+             else if (['sd'].includes(reqLang)) activeNakshatraList = nakshatrasDict['en']; 
+             else if (['as', 'mni'].includes(reqLang)) activeNakshatraList = nakshatrasDict['bn'];
+        }
+
+        let activeSolarList = solarMonths[reqLang] || solarMonths['en'];
+        if (!solarMonths[reqLang]) {
+             if (['kok', 'ks', 'sd'].includes(reqLang)) activeSolarList = solarMonths['hi'];
+             else if (['mni'].includes(reqLang)) activeSolarList = solarMonths['bn'];
+        }
+
+        let activeLunarList = lunarMonths[reqLang] || lunarMonths['en'];
+        if (!lunarMonths[reqLang]) {
+             if (['as', 'or', 'bn'].includes(reqLang)) activeLunarList = lunarMonths['hi']; 
+        }
 
         let isLunarTradition = ['vikram', 'purnimanta', 'amanta', 'telugu', 'kannada', 'marathi', 'gujarati', 'konkani', 'kashmiri', 'manipuri', 'sindhi'].includes(tradition);
         let isPurnimanta = ['purnimanta', 'vikram', 'kashmiri', 'sindhi', 'punjabi', 'nepali'].includes(tradition);
@@ -141,7 +196,6 @@ app.post('/monthly-calendar', async (req, res) => {
         let events = []; 
         let daysInMonth = new Date(year, month, 0).getDate();
         
-        // 🌟 ഓരോ കലണ്ടറിന്റെയും വർഷാരംഭം കാണിക്കാനുള്ള വേരിയബിൾ 
         let regionalYear = year;
         let regionalMonthDisplay = "";
         
@@ -155,10 +209,9 @@ app.post('/monthly-calendar', async (req, res) => {
             let sunDeg = (eph.swe_calc_ut(jd, Constants.SE_SUN, Constants.SEFLG_SWIEPH).xx[0] - ayanamsa + 360) % 360;
 
             let nakshatraIndex = Math.floor(moonDeg / (360 / 27));
-            nakshatras[dateStr] = activeNakshatraList[nakshatraIndex];
+            nakshatras[dateStr] = activeNakshatraList[nakshatraIndex] || "";
 
             if (isLunarTradition) {
-                // 🌟 Lunar Calculation (ചാന്ദ്രമാനം - ഉദാ: വിക്രമ സംവത്) 🌟
                 let diff = (moonDeg - sunDeg + 360) % 360;
                 let tithiIndex = Math.floor(diff / 12);
                 let tithiDay = (tithiIndex % 15) + 1;
@@ -171,18 +224,14 @@ app.post('/monthly-calendar', async (req, res) => {
                 let lunarMonthName = activeLunarList[lunarMonthIndex] || activeLunarList[0];
                 let paksha = tithiIndex < 15 ? (reqLang === 'en' ? "S" : "ശുക്ല") : (reqLang === 'en' ? "K" : "കൃഷ്ണ");
                 
-                regionalYear = year + 57; // വിക്രമ സംവത് വർഷം
+                regionalYear = year + 57; 
                 if (day === 15) regionalMonthDisplay = `വിക്രമ സംവത് ${regionalYear} - ${lunarMonthName}`;
 
-                // ഗ്രിഡിൽ മനോഹരമായി കാണിക്കാൻ രണ്ട് വരികളായി (മാസം, തിഥി) നൽകുന്നു
                 regionalDates[dateStr] = `${lunarMonthName}\n${paksha} ${tithiDay}`; 
-
             } else {
-                // 🌟 Solar Calculation (സൗരമാനം - ഉദാ: കേരളം, തമിഴ്നാട്) 🌟
                 let sunRasi = Math.floor(sunDeg / 30);
                 let dayInSolarMonth = Math.floor(sunDeg % 30) + 1;
                 
-                // കൊല്ലവർഷം കണക്കാക്കാൻ (ചിങ്ങം 1 അനുസരിച്ച് മാറും)
                 regionalYear = (month > 8 || (month === 8 && day > 16)) ? year - 824 : year - 825;
                 if (day === 15) regionalMonthDisplay = `${tradition === 'kerala' ? 'കൊല്ലവർഷം' : 'സൗരമാനം'} ${regionalYear} - ${activeSolarList[sunRasi]}`;
 
@@ -195,7 +244,7 @@ app.post('/monthly-calendar', async (req, res) => {
             events, 
             regional_dates: regionalDates, 
             nakshatras,
-            regional_header: regionalMonthDisplay // കലണ്ടറിന് മുകളിൽ കാണിക്കാനുള്ള വർഷവും മാസവും
+            regional_header: regionalMonthDisplay
         };
         
         setCachedResponse(cacheKey, responseData);
@@ -205,10 +254,6 @@ app.post('/monthly-calendar', async (req, res) => {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
-
-
-
-
 
 
 
