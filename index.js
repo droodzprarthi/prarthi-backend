@@ -8,11 +8,9 @@ app.use(express.json());
 
 // ==========================================
 // 🚀 IN-MEMORY CACHE ENGINE (POST & GET Caching)
-// സെർവർ ലോഡ് കുറയ്ക്കാനും സ്പീഡ് കൂട്ടാനുമുള്ള കാഷ് സിസ്റ്റം
-// പൊതുവായ ഡാറ്റയ്ക്ക് (Calendar, Festivals) മാത്രം ഇത് ഉപയോഗിക്കുക.
 // ==========================================
 const apiCache = new Map();
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 മണിക്കൂർ വാലിഡിറ്റി
+const CACHE_TTL = 24 * 60 * 60 * 1000; 
 
 const getCachedResponse = (key) => {
     const cached = apiCache.get(key);
@@ -25,7 +23,6 @@ const getCachedResponse = (key) => {
 };
 
 const setCachedResponse = (key, data) => {
-    // കാഷ് മെമ്മറി 2000 ഐറ്റത്തിൽ കൂടുതൽ ആയാൽ പഴയവ ഒഴിവാക്കുന്നു
     if (apiCache.size > 2000) {
         const oldestKey = apiCache.keys().next().value;
         apiCache.delete(oldestKey);
@@ -53,15 +50,13 @@ const eph = {
 };
 const load = async () => eph;
 
-// സെർവർ വർക്ക് ചെയ്യുന്നുണ്ടോ എന്ന് പരിശോധിക്കാനുള്ള വഴി
 app.get('/', (req, res) => {
     res.set('Cache-Control', 'public, max-age=3600');
     res.send("Prarthi Astrology Backend is Running Perfectly with Native SwissEph & Caching Engine!");
 });
 
 // ==========================================
-// 1. ജാതകം ഗണിക്കുന്ന ഭാഗം (Horoscope API)
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
+// 1. Horoscope API
 // ==========================================
 app.post('/generate-horoscope', async (req, res) => {
     try {
@@ -89,10 +84,7 @@ app.post('/generate-horoscope', async (req, res) => {
           
           let isRetrograde = pos.xx[3] < 0; 
           
-          positions[p.name] = { 
-              degree: siderealDeg, 
-              is_retrograde: isRetrograde
-          };
+          positions[p.name] = { degree: siderealDeg, is_retrograde: isRetrograde };
         }
         positions["Ketu"] = { degree: (positions["Rahu"].degree + 180) % 360 };
 
@@ -100,22 +92,15 @@ app.post('/generate-horoscope', async (req, res) => {
         let ascendantSidereal = (houses.ascendant - ayanamsa + 360) % 360;
         const nakshatraIndex = Math.floor(positions["Moon"].degree / (360 / 27));
 
-        const responseData = { 
-            success: true, 
-            ascendant: ascendantSidereal, 
-            planets: positions, 
-            nakshatra_index: nakshatraIndex 
-        };
-
+        const responseData = { success: true, ascendant: ascendantSidereal, planets: positions, nakshatra_index: nakshatraIndex };
         res.status(200).json(responseData);
     } catch (e) {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
 
-
 // ==========================================
-// 18. Monthly Calendar Data API (For Grid UI) - FULLY FIXED
+// 18. Monthly Calendar Data API
 // ==========================================
 app.post('/monthly-calendar', async (req, res) => {
     try {
@@ -222,9 +207,23 @@ app.post('/monthly-calendar', async (req, res) => {
                 }
 
                 let lunarMonthName = activeLunarList[lunarMonthIndex] || activeLunarList[0];
-                let paksha = tithiIndex < 15 ? (reqLang === 'en' ? "S" : "ശുക്ല") : (reqLang === 'en' ? "K" : "കൃഷ്ണ");
                 
+                // 🌟 1. ഭാഷകൾക്കനുസരിച്ചുള്ള പക്ഷം (Paksha) ഫിക്സ് 🌟
+                const pakshaDict = {
+                    'ml': ["ശുക്ല", "കൃഷ്ണ"], 'ta': ["சுக்ல", "கிருஷ்ண"], 'hi': ["शुक्ल", "कृष्ण"],
+                    'te': ["శుక్ల", "కృష్ణ"], 'kn': ["ಶುಕ್ಲ", "ಕೃಷ್ಣ"], 'bn': ["শুক্ল", "কৃষ্ণ"],
+                    'gu': ["સુદ", "વદ"], 'or': ["ଶୁକ୍ଳ", "କୃଷ୍ଣ"], 'pa': ["ਸ਼ੁਕਲ", "ਕ੍ਰਿਸ਼ਨ"],
+                    'mni': ["ꯁꯨꯛꯂ", "ꯀ꯭ꯔꯤꯁ꯭ꯅ"], 'en': ["S", "K"]
+                };
+                let activePakshaList = pakshaDict[reqLang] || pakshaDict['hi'];
+                let paksha = tithiIndex < 15 ? activePakshaList[0] : activePakshaList[1];
+                
+                // 🌟 2. ഗുജറാത്തി കലണ്ടറിനുള്ള വർഷാരംഭം ഫിക്സ് 🌟
                 regionalYear = year + 57; 
+                if (tradition === 'gujarati' && lunarMonthIndex < 7) {
+                    regionalYear -= 1; // ഗുജറാത്തിൽ കാർത്തിക മാസത്തിന് (index 7) മുൻപുള്ള മാസങ്ങളിൽ പഴയ വർഷം കാണിക്കാൻ
+                }
+
                 if (day === 15) regionalMonthDisplay = `വിക്രമ സംവത് ${regionalYear} - ${lunarMonthName}`;
 
                 regionalDates[dateStr] = `${lunarMonthName}\n${paksha} ${tithiDay}`; 
@@ -255,14 +254,8 @@ app.post('/monthly-calendar', async (req, res) => {
     }
 });
 
-
-
-
 // ==========================================
-// 2. പഞ്ചാംഗം & കൃത്യമായ അവസാന സമയം (Exact End Timings)
-
-// ==========================================
-// 18. മുഹൂർത്തങ്ങൾ കണ്ടുപിടിക്കാനുള്ള API (Get Muhurats API)
+// 18. മുഹൂർത്തങ്ങൾ API
 // ==========================================
 app.post('/get-muhurats', async (req, res) => {
     try {
@@ -281,7 +274,6 @@ app.post('/get-muhurats', async (req, res) => {
         let muhurats = [];
         let daysInMonth = new Date(year, month, 0).getDate();
 
-        // മാസം മുഴുവനുള്ള ദിവസങ്ങൾ പരിശോധിച്ച് മുഹൂർത്തങ്ങൾ കണക്കാക്കുന്നു
         for (let day = 1; day <= daysInMonth; day++) {
             let jd = eph.swe_julday(year, month, day, 6.5, Constants.SE_GREG_CAL);
             let ayanamsa = eph.swe_get_ayanamsa_ut(jd);
@@ -295,9 +287,8 @@ app.post('/get-muhurats', async (req, res) => {
             let tithiIndex = Math.floor(diff / 12);
             let nakshatraIndex = Math.floor(moonDeg / (360 / 27));
 
-            // മുഹൂർത്തത്തിന് അനുയോജ്യമായ ശുഭ തിഥികളും നക്ഷത്രങ്ങളും
             const auspiciousTithis = [1, 2, 3, 4, 6, 7, 9, 10, 11, 12, 13];
-            const auspiciousNakshatras = [0, 3, 4, 6, 7, 9, 11, 12, 13, 16, 18, 21, 26]; // അശ്വതി, രോഹിണി, മൃഗശിര, പുണർതം, പൂയം, മകം, ഉത്രം മുതലായവ
+            const auspiciousNakshatras = [0, 3, 4, 6, 7, 9, 11, 12, 13, 16, 18, 21, 26]; 
 
             if (auspiciousTithis.includes(tithiIndex % 15) && auspiciousNakshatras.includes(nakshatraIndex)) {
                 let formattedMonth = String(month).padStart(2, '0');
@@ -323,7 +314,7 @@ app.post('/get-muhurats', async (req, res) => {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
-// ==========================================
+
 app.post('/get-panchangam', async (req, res) => {
     try {
         const body = req.body;
@@ -437,8 +428,7 @@ app.post('/get-panchangam', async (req, res) => {
 });
 
 // ==========================================
-// 3. പൊരുത്തം നോക്കാനുള്ള ഭാഗം (Marriage Matching API)
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
+// 3. പൊരുത്തം നോക്കാനുള്ള ഭാഗം
 // ==========================================
 app.post('/calculate-porutham', async (req, res) => {
     try {
@@ -552,15 +542,13 @@ app.post('/calculate-porutham', async (req, res) => {
         else if (Math.abs(papaDiff) < 5) papasamyamMatch = "Good";
         else papasamyamMatch = "Bad"; 
 
-        // ... (മുകളിലത്തെ കോഡുകൾ മാറ്റമില്ല)
-
         let manglikMatch = (boy.is_manglik === girl.is_manglik);
         let sarpaDoshaMatch = (boy.has_sarpa_dosham === girl.has_sarpa_dosham);
 
         const responseData = { 
             success: true, 
-            boy: boy,   // 🌟 ഈ വരി പുതിയതായി ചേർക്കുക (ഇതാണ് ആപ്പിലെ എറർ മാറ്റുന്നത്)
-            girl: girl, // 🌟 ഈ വരി പുതിയതായി ചേർക്കുക (ഇതാണ് ആപ്പിലെ എറർ മാറ്റുന്നത്)
+            boy: boy,
+            girl: girl,
             kerala_10_porutham: { 
                 score: `${tenPoruthamScore}/10`, 
                 dinam, ganam, yoni, rasi, rajju, mahendram, stree_dheergham: streeDheergham,
@@ -599,8 +587,7 @@ app.post('/calculate-porutham', async (req, res) => {
 });
 
 // ==========================================
-// 4. സമ്പൂർണ്ണ ദോഷ നിർണ്ണയം (Manglik Dosha Fixed)
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
+// 4. സമ്പൂർണ്ണ ദോഷ നിർണ്ണയം
 // ==========================================
 app.post('/calculate-dosha', async (req, res) => {
     try {
@@ -791,7 +778,6 @@ app.post('/calculate-muhurtha', async (req, res) => {
 
 // ==========================================
 // 6. വിംശോത്തരി ദശ
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-dasha', async (req, res) => {
     try {
@@ -844,7 +830,6 @@ app.post('/calculate-dasha', async (req, res) => {
 
 // ==========================================
 // 7. 16 വർഗ്ഗ ചാർട്ടുകൾ
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-vargas', async (req, res) => {
     try {
@@ -916,7 +901,6 @@ app.post('/calculate-vargas', async (req, res) => {
 
 // ==========================================
 // 8. KP System & Ashtakavarga API
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
 // ==========================================
 app.post('/calculate-kp-ashtakavarga', async (req, res) => {
     try {
@@ -998,8 +982,7 @@ app.post('/calculate-kp-ashtakavarga', async (req, res) => {
 });
 
 // ==========================================
-// 9. Numerology API (Pythagorean System)
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
+// 9. Numerology API
 // ==========================================
 app.post('/calculate-numerology', async (req, res) => {
     try {
@@ -1046,8 +1029,7 @@ app.post('/calculate-numerology', async (req, res) => {
 });
 
 // ==========================================
-// 10. Daily Horoscope, Gocharam & Nakshatra Details API
-// 🌟 വ്യക്തിഗത ഡാറ്റ ആയതിനാൽ ഇവിടെ കാഷെ ഉപയോഗിക്കുന്നില്ല 🌟
+// 10. Daily Horoscope
 // ==========================================
 app.post('/daily-horoscope', async (req, res) => {
     try {
@@ -1167,7 +1149,7 @@ app.post('/premium-alerts', async (req, res) => {
 });
 
 // ==========================================
-// 13. SHASTRA OMENS (ഗൗളി, സ്വപ്നം, ശകുനം, തുമ്മൽ, കാക്ക)
+// 13. SHASTRA OMENS 
 // ==========================================
 app.get('/get-shastra-omens', (req, res) => {
     try {
@@ -1269,7 +1251,7 @@ app.get('/get-shastra-omens', (req, res) => {
 });
 
 // ==========================================
-// 14. പാൻ-ഇന്ത്യൻ ബലിയിടേണ്ട തീയതി (Next Shraddha / Bali Date)
+// 14. പാൻ-ഇന്ത്യൻ ബലിയിടേണ്ട തീയതി 
 // ==========================================
 app.post('/calculate-next-bali', async (req, res) => {
     try {
@@ -1361,7 +1343,7 @@ app.post('/calculate-next-bali', async (req, res) => {
 });
 
 // ==========================================
-// 16. FULL YEARLY FESTIVAL CALCULATOR (Dynamic using SwissEph)
+// 16. FULL YEARLY FESTIVAL CALCULATOR
 // ==========================================
 app.post('/calculate-yearly-festivals', async (req, res) => {
     try {
@@ -1445,7 +1427,7 @@ app.post('/calculate-yearly-festivals', async (req, res) => {
 });
 
 // ==========================================
-// 17. അടുത്ത വ്രതങ്ങളുടെ തീയതി കണ്ടുപിടിക്കാനുള്ള API (Next Vratham Dates)
+// 17. അടുത്ത വ്രതങ്ങളുടെ തീയതി കണ്ടുപിടിക്കാനുള്ള API
 // ==========================================
 app.post('/calculate-upcoming-vrathams', async (req, res) => {
     try {
