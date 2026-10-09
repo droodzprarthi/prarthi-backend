@@ -381,12 +381,21 @@ app.post('/get-panchangam', async (req, res) => {
                             if (h === 0) h = 12;
                             
                             let timeStr = `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')} ${ampm}`;
-                            return isNextDay ? `${timeStr} (നാളെ)` : timeStr;
+                            
+                            // 🌟 ഭാഷയനുസരിച്ച് തർജ്ജമ ചെയ്യാനുള്ള കോഡ് 🌟
+                            const reqLang = body.lang || 'ml';
+                            const tomorrowText = (reqLang === 'ml') ? "(നാളെ)" : (reqLang === 'hi') ? "(कल)" : (reqLang === 'ta') ? "(நாளை)" : "(Tomorrow)";
+                            
+                            return isNextDay ? `${timeStr} ${tomorrowText}` : timeStr;
                         }
                     }
                 }
             }
-            return "നാളെ ശേഷം";
+            
+            // 🌟 ഭാഷയനുസരിച്ച് തർജ്ജമ ചെയ്യാനുള്ള കോഡ് 🌟
+            const reqLang = body.lang || 'ml';
+            const afterTomorrowText = (reqLang === 'ml') ? "നാളെ ശേഷം" : (reqLang === 'hi') ? "कल के बाद" : (reqLang === 'ta') ? "நாளைக்கு பிறகு" : "After Tomorrow";
+            return afterTomorrowText;
         };
 
         const ayanamsa = eph.swe_get_ayanamsa_ut(jd);
@@ -533,6 +542,7 @@ app.post('/calculate-porutham', async (req, res) => {
         };
         let totalAshtakoota = Object.values(ashtakoota).reduce((a, b) => a + b, 0);
 
+        // ... മുകളിലെ കോഡുകൾ അതുപോലെ തന്നെ ...
         let dasaSandhiDifference = Math.abs(boy.balance_dasha_years - girl.balance_dasha_years);
         let hasDasaSandhi = dasaSandhiDifference < 1.0; 
 
@@ -544,6 +554,21 @@ app.post('/calculate-porutham', async (req, res) => {
 
         let manglikMatch = (boy.is_manglik === girl.is_manglik);
         let sarpaDoshaMatch = (boy.has_sarpa_dosham === girl.has_sarpa_dosham);
+
+        // 🌟 ദശാസന്ധി വാണിംഗ് ഭാഷയനുസരിച്ച് നൽകുന്നു 🌟
+        let warningMsg = "";
+        const reqLang = body.lang || 'ml';
+        if(reqLang === 'ml') {
+            warningMsg = hasDasaSandhi ? "വിവാഹ സമയത്ത് ഇരുവർക്കും ഒരേസമയം ദശാമാറ്റം വരുന്നതിനാൽ ദശാസന്ധി ദോഷമുണ്ട്." : "ദശാസന്ധി ദോഷമില്ല.";
+        } else if(reqLang === 'en') {
+            warningMsg = hasDasaSandhi ? "Dasa Sandhi dosham is present as both have dasa changes at the same time." : "No Dasa Sandhi dosham.";
+        } else if(reqLang === 'hi') {
+            warningMsg = hasDasaSandhi ? "दशा संधि दोष मौजूद है।" : "दशा संधि दोष नहीं है।";
+        } else if(reqLang === 'ta') {
+            warningMsg = hasDasaSandhi ? "திருமண நேரத்தில் இருவருக்கும் ஒரே நேரத்தில் தசா மாற்றம் வருவதால் தசா சந்தி தோஷம் உள்ளது." : "தசா சந்தி தோஷம் இல்லை.";
+        } else {
+            warningMsg = hasDasaSandhi ? "Dasa Sandhi dosham is present." : "No Dasa Sandhi dosham.";
+        }
 
         const responseData = { 
             success: true, 
@@ -576,7 +601,7 @@ app.post('/calculate-porutham', async (req, res) => {
             },
             dasa_sandhi: { 
                 has_dasa_sandhi: hasDasaSandhi, 
-                warning: hasDasaSandhi ? "വിവാഹ സമയത്ത് ഇരുവർക്കും ഒരേസമയം ദശാമാറ്റം വരുന്നതിനാൽ ദശാസന്ധി ദോഷമുണ്ട്." : "ദശാസന്ധി ദോഷമില്ല."
+                warning: warningMsg // 🌟 അപ്ഡേറ്റ് ചെയ്ത വാണിംഗ് മെസ്സേജ് 
             }
         };
 
