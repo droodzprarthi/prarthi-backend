@@ -707,6 +707,9 @@ app.post('/calculate-dosha', async (req, res) => {
 // ==========================================
 // 5. ഹോര, ഗൗരീ & കാലങ്ങൾ
 // ==========================================
+// ==========================================
+// 5. ഹോര, ഗൗരീ & കാലങ്ങൾ
+// ==========================================
 app.post('/calculate-muhurtha', async (req, res) => {
     try {
         const body = req.body;
@@ -737,8 +740,10 @@ app.post('/calculate-muhurtha', async (req, res) => {
         const dayOfWeek = new Date(body.year, body.month - 1, body.day).getDay(); 
 
         const horaLords = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"];
-        const planetsMalayalam = { "Sun": "സൂര്യൻ", "Venus": "ശുക്രൻ", "Mercury": "ബുധൻ", "Moon": "ചന്ദ്രൻ", "Saturn": "ശനി", "Jupiter": "വ്യാഴം", "Mars": "ചൊവ്വ" };
-        const horaStatus = { "Sun": "അശുഭം", "Venus": "ശുഭം", "Mercury": "ശുഭം", "Moon": "ശുഭം", "Saturn": "അശുഭം", "Jupiter": "ശുഭം", "Mars": "അശുഭം" };
+        
+        // 🌟 മാറ്റം: മലയാളത്തിന് പകരം Keys നൽകുന്നു 🌟
+        const planetKeys = { "Sun": "planet_sun", "Venus": "planet_venus", "Mercury": "planet_mercury", "Moon": "planet_moon", "Saturn": "planet_saturn", "Jupiter": "planet_jupiter", "Mars": "planet_mars" };
+        const horaStatusKeys = { "Sun": "status_bad", "Venus": "status_good", "Mercury": "status_good", "Moon": "status_good", "Saturn": "status_bad", "Jupiter": "status_good", "Mars": "status_bad" };
 
         const formatTime = (decTime) => {
             let h = Math.floor(decTime) % 24, m = Math.floor((decTime - Math.floor(decTime)) * 60);
@@ -751,16 +756,17 @@ app.post('/calculate-muhurtha', async (req, res) => {
         let currTime = sunrise;
         for(let i = 0; i < 12; i++) {
            let pIndex = (dayOfWeek + i * 5) % 7, endTime = currTime + dayHoraLen;
-           horaList.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, planet: planetsMalayalam[horaLords[pIndex]], status: horaStatus[horaLords[pIndex]] });
+           horaList.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, planet: planetKeys[horaLords[pIndex]], status: horaStatusKeys[horaLords[pIndex]] });
            currTime = endTime;
         }
         for(let i = 12; i < 24; i++) {
            let pIndex = (dayOfWeek + i * 5) % 7, endTime = currTime + nightHoraLen;
-           horaList.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, planet: planetsMalayalam[horaLords[pIndex]], status: horaStatus[horaLords[pIndex]] });
+           horaList.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, planet: planetKeys[horaLords[pIndex]], status: horaStatusKeys[horaLords[pIndex]] });
            currTime = endTime;
         }
 
-        const gowriNames = ["ഉദ്വേഗം (അശുഭം)", "ചരം (മധ്യമം)", "ലാഭം (ശുഭം)", "അമൃതം (അത്യുത്തമം)", "കാലം (അശുഭം)", "ശുഭം (ശുഭം)", "രോഗം (അശുഭം)"];
+        // 🌟 മാറ്റം: മലയാളത്തിന് പകരം Keys നൽകുന്നു 🌟
+        const gowriKeys = ["gowri_udvegam", "gowri_charam", "gowri_labham", "gowri_amrutham", "gowri_kalam", "gowri_shubham", "gowri_rogam"];
         const dayOffsets = [0, 3, 6, 2, 5, 1, 4], nightOffsets = [5, 1, 4, 0, 3, 6, 2];
 
         let gowriDay = [], gowriNight = [];
@@ -769,13 +775,13 @@ app.post('/calculate-muhurtha', async (req, res) => {
         currTime = sunrise;
         for(let i = 0; i < 8; i++) {
            let endTime = currTime + dayGowriLen;
-           gowriDay.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, name: gowriNames[(dayOffsets[dayOfWeek] + i) % 7] });
+           gowriDay.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, name: gowriKeys[(dayOffsets[dayOfWeek] + i) % 7] });
            currTime = endTime;
         }
         currTime = sunset;
         for(let i = 0; i < 8; i++) {
            let endTime = currTime + nightGowriLen;
-           gowriNight.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, name: gowriNames[(nightOffsets[dayOfWeek] + i) % 7] });
+           gowriNight.push({ time: `${formatTime(currTime)} - ${formatTime(endTime)}`, name: gowriKeys[(nightOffsets[dayOfWeek] + i) % 7] });
            currTime = endTime;
         }
 
@@ -800,7 +806,6 @@ app.post('/calculate-muhurtha', async (req, res) => {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
-
 // ==========================================
 // 6. വിംശോത്തരി ദശ
 // ==========================================
@@ -1176,80 +1181,73 @@ app.post('/premium-alerts', async (req, res) => {
 // ==========================================
 // 13. SHASTRA OMENS 
 // ==========================================
+// ==========================================
+// 13. SHASTRA OMENS 
+// ==========================================
 app.get('/get-shastra-omens', (req, res) => {
     try {
-        const lang = req.query.lang || "ml";
-        const cacheKey = `shastras_${lang}`;
+        const cacheKey = `shastras_all_keys`;
         const cached = getCachedResponse(cacheKey);
         if (cached) {
             res.set('Cache-Control', 'public, max-age=86400');
             return res.status(200).json(cached);
         }
         
+        // 🌟 മാറ്റം: ഫ്രണ്ട്എൻഡിലേക്ക് വിവർത്തനം ചെയ്യാൻ പാകത്തിൽ കീകൾ മാത്രം അയക്കുന്നു 🌟
         const omensData = {
             "gowli_shastra": {
-                "category_ml": "ഗൗളീശാസ്ത്രം (പല്ലി വീഴുന്ന ഫലം)",
-                "category_en": "Lizard Astrology (Gowli Shastra)",
+                "category_key": "omens_cat_gowli",
                 "rules": [
-                    { "condition_ml": "പുരുഷന്റെ വലതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Man's Right Side", "result_ml": "ശുഭഫലം (Good Luck)", "result_en": "Auspicious (Good Luck)" },
-                    { "condition_ml": "പുരുഷന്റെ ഇടതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Man's Left Side", "result_ml": "അശുഭഫലം (Bad Luck)", "result_en": "Inauspicious (Bad Luck)" },
-                    { "condition_ml": "സ്ത്രീയുടെ ഇടതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Woman's Left Side", "result_ml": "ശുഭഫലം (Good Luck)", "result_en": "Auspicious (Good Luck)" },
-                    { "condition_ml": "സ്ത്രീയുടെ വലതു ഭാഗത്ത് വീണാൽ", "condition_en": "Falls on Woman's Right Side", "result_ml": "അശുഭഫലം (Bad Luck)", "result_en": "Inauspicious (Bad Luck)" },
-                    { "condition_ml": "തലയിൽ വീണാൽ (രണ്ടുപേർക്കും)", "condition_en": "Falls on Head", "result_ml": "കടുത്ത ദുഃഖം, കലഹം", "result_en": "Sorrow, Disputes" },
-                    { "condition_ml": "നെറ്റിയിൽ വീണാൽ", "condition_en": "Falls on Forehead", "result_ml": "സ്ഥാനമാനങ്ങൾ ലഭിക്കും", "result_en": "Honor & Promotions" },
-                    { "condition_ml": "പാദത്തിൽ വീണാൽ", "condition_en": "Falls on Feet", "result_ml": "യാത്രാക്ലേശം, യാത്രകൾ വേണ്ടിവരും", "result_en": "Travel, Tiredness" }
+                    { "condition_key": "gowli_cond_1", "result_key": "gowli_res_1" },
+                    { "condition_key": "gowli_cond_2", "result_key": "gowli_res_2" },
+                    { "condition_key": "gowli_cond_3", "result_key": "gowli_res_3" },
+                    { "condition_key": "gowli_cond_4", "result_key": "gowli_res_4" },
+                    { "condition_key": "gowli_cond_5", "result_key": "gowli_res_5" },
+                    { "condition_key": "gowli_cond_6", "result_key": "gowli_res_6" },
+                    { "condition_key": "gowli_cond_7", "result_key": "gowli_res_7" }
                 ],
-                "regional_info_ml": "കേരളത്തിൽ ഗാർഗ്യ സ്മൃതി പ്രകാരം പല്ലി ശരീരത്തിൽ വീഴുന്നതിനാണ് പ്രാധാന്യം. എന്നാൽ തമിഴ്‌നാട്ടിലും ആന്ധ്രയിലും പല്ലി ചിലയ്ക്കുന്ന (ശബ്ദമുണ്ടാക്കുന്ന) ദിശയും ദിവസവും നോക്കുന്ന 'ഗൗളി പഞ്ചാംഗം' രീതിയാണ് കൂടുതൽ പ്രചാരത്തിലുള്ളത്.",
-                "regional_info_en": "In Kerala, Gowli falling on the body is significant. In Tamil Nadu & Andhra, the direction and day of the Lizard's chirping are deeply analyzed (Gowli Panchangam)."
+                "regional_info_key": "gowli_regional_info"
             },
             "swapna_shastra": {
-                "category_ml": "സ്വപ്ന ശാസ്ത്രം",
-                "category_en": "Dream Interpretations",
+                "category_key": "omens_cat_swapna",
                 "rules": [
-                    { "condition_ml": "ആനയെ സ്വപ്നം കണ്ടാൽ", "condition_en": "Seeing an Elephant", "result_ml": "സമ്പത്ത്, ഐശ്വര്യം (കേരളത്തിൽ പൂർവ്വികരുടെ സാന്നിധ്യമായും കാണുന്നു)", "result_en": "Wealth & Prosperity (Ancestral presence in Kerala)" },
-                    { "condition_ml": "പാമ്പ് കടിക്കുന്നതായി കണ്ടാൽ", "condition_en": "Snake Biting", "result_ml": "ശത്രുനാശം, ധനലാഭം", "result_en": "Victory over enemies, Financial gain" },
-                    { "condition_ml": "പല്ല് കൊഴിയുന്നതായി കണ്ടാൽ", "condition_en": "Falling Teeth", "result_ml": "കുടുംബത്തിൽ രോഗം അല്ലെങ്കിൽ ദുഃഖം", "result_en": "Sickness or sorrow in the family" },
-                    { "condition_ml": "മരണമോ ശവമോ കണ്ടാൽ", "condition_en": "Seeing Death or Corpse", "result_ml": "ആയുർദൈർഘ്യം വർദ്ധിക്കും, രോഗമുക്തി", "result_en": "Long life, Recovery from illness" },
-                    { "condition_ml": "തീപിടുത്തം കണ്ടാൽ", "condition_en": "Seeing Fire", "result_ml": "സ്ഥാനക്കയറ്റം, പുതിയ ഉത്തരവാദിത്തങ്ങൾ", "result_en": "Promotions, New responsibilities" }
+                    { "condition_key": "swapna_cond_1", "result_key": "swapna_res_1" },
+                    { "condition_key": "swapna_cond_2", "result_key": "swapna_res_2" },
+                    { "condition_key": "swapna_cond_3", "result_key": "swapna_res_3" },
+                    { "condition_key": "swapna_cond_4", "result_key": "swapna_res_4" },
+                    { "condition_key": "swapna_cond_5", "result_key": "swapna_res_5" }
                 ],
-                "regional_info_ml": "സ്വപ്നം കാണുന്ന യാമം (സമയം) അനുസരിച്ച് ഫലസിദ്ധി വ്യത്യാസപ്പെടും. രാത്രി ആദ്യ യാമത്തിൽ കണ്ടാൽ 1 വർഷം കൊണ്ടും, പുലർച്ചെ (ബ്രാഹ്മമുഹൂർത്തത്തിൽ) കണ്ടാൽ അന്ന് തന്നെയോ ആഴ്ചകൾക്കുള്ളിലോ ഫലിക്കും.",
-                "regional_info_en": "Dreams seen in the early night take a year to manifest, while dreams seen in the early morning (Brahma Muhurta) manifest immediately."
+                "regional_info_key": "swapna_regional_info"
             },
             "shakunam": {
-                "category_ml": "യാത്രാ ശകുനങ്ങൾ (നിമിത്തങ്ങൾ)",
-                "category_en": "Travel Omens & Signs",
+                "category_key": "omens_cat_shakunam",
                 "rules": [
-                    { "condition_ml": "മംഗല്യവതി, നിറകുടം, പശു എന്നിവയെ കാണുന്നത്", "condition_en": "Seeing Married Woman, Full Pot, Cow", "result_ml": "ഉത്തമ ശകുനം (കാര്യവിജയം)", "result_en": "Highly Auspicious (Success)" },
-                    { "condition_ml": "പൂച്ച കുറുകെ ചാടുന്നത്", "condition_en": "Cat crossing the path", "result_ml": "അശുഭം (യാത്ര അല്പനേരം മാറ്റിവെക്കുക)", "result_en": "Inauspicious (Delay the trip)" },
-                    { "condition_ml": "വിറക്, ഒഴിഞ്ഞ പാത്രം എന്നിവ കാണുന്നത്", "condition_en": "Seeing Firewood, Empty Pot", "result_ml": "തടസ്സങ്ങൾ", "result_en": "Obstacles" },
-                    { "condition_ml": "ഇരട്ട ബ്രാഹ്മണരെ കാണുന്നത്", "condition_en": "Seeing Twin Brahmins", "result_ml": "അത്യുത്തമം", "result_en": "Highly Auspicious" }
+                    { "condition_key": "shakunam_cond_1", "result_key": "shakunam_res_1" },
+                    { "condition_key": "shakunam_cond_2", "result_key": "shakunam_res_2" },
+                    { "condition_key": "shakunam_cond_3", "result_key": "shakunam_res_3" },
+                    { "condition_key": "shakunam_cond_4", "result_key": "shakunam_res_4" }
                 ],
-                "regional_info_ml": "ഉത്തരേന്ത്യൻ ശകുന ശാസ്ത്രത്തിൽ മൃഗങ്ങളുടെ നീക്കങ്ങൾക്കും (ഉദാഹരണത്തിന് യാത്ര പോകുമ്പോൾ പട്ടി ഇടത്തുനിന്നും വലത്തോട്ട് പോയാൽ ശുഭം) പ്രാധാന്യമുണ്ട്.",
-                "regional_info_en": "North Indian Shakun Shastra places high importance on the movement direction of animals crossing your path."
+                "regional_info_key": "shakunam_regional_info"
             },
             "anga_samudrika": {
-                "category_ml": "അംഗ സാമുദ്രികം (ശരീരം തുടിക്കുന്ന ഫലം)",
-                "category_en": "Anga Samudrika (Body Twitching)",
+                "category_key": "omens_cat_anga",
                 "rules": [
-                    { "condition_ml": "പുരുഷന്റെ വലതുകണ്ണ് തുടിച്ചാൽ", "condition_en": "Man's Right Eye Twitches", "result_ml": "ശുഭവാർത്ത, ഇഷ്ടജന സമാഗമം", "result_en": "Good news, Meeting loved ones" },
-                    { "condition_ml": "സ്ത്രീയുടെ ഇടതുകണ്ണ് തുടിച്ചാൽ", "condition_en": "Woman's Left Eye Twitches", "result_ml": "ശുഭവാർത്ത, സന്തോഷം", "result_en": "Good news, Happiness" },
-                    { "condition_ml": "വലത്തെ ഉള്ളംകൈ തരിച്ചാൽ", "condition_en": "Right Palm Itching", "result_ml": "ധനലാഭം", "result_en": "Financial Gain" },
-                    { "condition_ml": "ഇടത്തെ ഉള്ളംകൈ തരിച്ചാൽ", "condition_en": "Left Palm Itching", "result_ml": "ധനനഷ്ടം (സ്ത്രീകൾക്ക് ധനലാഭം)", "result_en": "Financial Loss (Gain for Women)" }
+                    { "condition_key": "anga_cond_1", "result_key": "anga_res_1" },
+                    { "condition_key": "anga_cond_2", "result_key": "anga_res_2" },
+                    { "condition_key": "anga_cond_3", "result_key": "anga_res_3" },
+                    { "condition_key": "anga_cond_4", "result_key": "anga_res_4" }
                 ],
-                "regional_info_ml": "മിക്കയിടത്തും വലതുഭാഗം പുരുഷന്മാർക്കും ഇടതുഭാഗം സ്ത്രീകൾക്കും ഭാഗ്യമായി കണക്കാക്കുന്നു.",
-                "regional_info_en": "Generally, right side twitching is lucky for men, and left side is lucky for women."
+                "regional_info_key": "anga_regional_info"
             },
             "kaka_thummal": {
-                "category_ml": "കാക്ക ശാസ്ത്രം & തുമ്മൽ ശാസ്ത്രം",
-                "category_en": "Crow Omens & Sneezing Omens",
+                "category_key": "omens_cat_kaka",
                 "rules": [
-                    { "condition_ml": "യാത്ര പുറപ്പെടുമ്പോൾ ഒറ്റത്തവണ തുമ്മിയാൽ", "condition_en": "One Sneeze when leaving", "result_ml": "യാത്രാ തടസ്സം", "result_en": "Obstacle in travel" },
-                    { "condition_ml": "രണ്ടു തവണ തുടർച്ചയായി തുമ്മിയാൽ", "condition_en": "Two consecutive sneezes", "result_ml": "കാര്യവിജയം, ശുഭം", "result_en": "Success, Auspicious" },
-                    { "condition_ml": "വീടിനു മുന്നിൽ കാക്ക കരഞ്ഞാൽ", "condition_en": "Crow cawing in front of house", "result_ml": "അതിഥികൾ വരും", "result_en": "Guests will arrive" },
-                    { "condition_ml": "യാത്രയിൽ കാക്ക വലത്തുനിന്നും ഇടത്തോട്ട് പറന്നാൽ", "condition_en": "Crow flies Right to Left during travel", "result_ml": "ലാഭം, വിജയം", "result_en": "Profit, Victory" }
+                    { "condition_key": "kaka_cond_1", "result_key": "kaka_res_1" },
+                    { "condition_key": "kaka_cond_2", "result_key": "kaka_res_2" },
+                    { "condition_key": "kaka_cond_3", "result_key": "kaka_res_3" },
+                    { "condition_key": "kaka_cond_4", "result_key": "kaka_res_4" }
                 ],
-                "regional_info_ml": "തമിഴ്‌നാട്ടിൽ കാക്ക കരയുന്ന ദിശ നോക്കി ശകുനം പറയുന്ന 'കാക്ക ശാസ്ത്രം' വളരെ പ്രശസ്തമാണ്.",
-                "regional_info_en": "In Tamil Nadu, 'Kaka Shastra' (analyzing crow sounds and directions) is a highly respected tradition."
+                "regional_info_key": "kaka_regional_info"
             }
         };
 
@@ -1257,11 +1255,11 @@ app.get('/get-shastra-omens', (req, res) => {
             const shastra = omensData[key];
             return {
                 id: key,
-                category: lang === 'en' ? shastra.category_en : shastra.category_ml,
-                regional_info: lang === 'en' ? shastra.regional_info_en : shastra.regional_info_ml,
+                category: shastra.category_key,
+                regional_info: shastra.regional_info_key,
                 rules: shastra.rules.map(r => ({
-                    condition: lang === 'en' ? r.condition_en : r.condition_ml,
-                    result: lang === 'en' ? r.result_en : r.result_ml
+                    condition: r.condition_key,
+                    result: r.result_key
                 }))
             };
         });
@@ -1274,7 +1272,6 @@ app.get('/get-shastra-omens', (req, res) => {
         res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
-
 // ==========================================
 // 14. പാൻ-ഇന്ത്യൻ ബലിയിടേണ്ട തീയതി 
 // ==========================================
