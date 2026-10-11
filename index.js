@@ -102,6 +102,9 @@ app.post('/generate-horoscope', async (req, res) => {
 // ==========================================
 // 18. Monthly Calendar Data API
 // ==========================================
+// ==========================================
+// 18. Monthly Calendar Data API
+// ==========================================
 app.post('/monthly-calendar', async (req, res) => {
     try {
         const { year, month, lat, lon, tradition, lang } = req.body;
@@ -127,7 +130,7 @@ app.post('/monthly-calendar', async (req, res) => {
             'bn': ["অশ্বিনী", "ভরণী", "কৃত্তিকা", "রোহিণী", "মৃগশিরা", "আর্দ্রা", "পুনর্বসু", "পুষ্যা", "অশ্লেষা", "মঘা", "পূর্ব ফাল্গুনী", "উত্তর ফাল্গুনী", "হস্তা", "চিত্রা", "স্বাতী", "বিশাখা", "অনুরাধা", "জ্যেষ্ঠা", "মূলা", "পূর্বাষাঢ়া", "উত্তরাষাঢ়া", "শ্রবণা", "ধনিষ্ঠা", "শতভিষা", "পূর্ব ভাদ্রপদ", "উত্তর ভাদ্রপদ", "রেবতী"],
             'gu': ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશિરા", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ઠા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"],
             'or': ["ଅଶ୍ୱିନୀ", "ଭରଣୀ", "କୃତ୍ତିକା", "ରୋହିଣୀ", "ମୃଗଶିରା", "ଆର୍ଦ୍ରା", "ପୁନର୍ବସୁ", "ପୁଷ୍ୟା", "ଅଶ୍ଳେଷା", "ମଘା", "ପୂର୍ବ ଫାଲ୍ଗୁନୀ", "ଉତ୍ତର ଫାଲ୍ଗୁନୀ", "ହସ୍ତା", "ଚିତ୍ରା", "ସ୍ୱାତୀ", "ବିଶାଖା", "ଅନୁରାଧା", "ଜ୍ୟେଷ୍ଠା", "ମୂଳା", "ପୂର୍ବାଷାଢ଼ା", "ଉତ୍ତରାଷାଢ଼ା", "ଶ୍ରବଣା", "ଧନିଷ୍ଠା", "ଶତଭିଷା", "ପୂର୍ବ ଭାଦ୍ରପଦ", "ଉତ୍ତର ଭାଦ୍ରପଦ", "ରେବତୀ"],
-            'pa': ["ਅਸ਼ਵਿਨੀ", "ਭਰਣੀ", "ਕ੍ਰਿਤਿਕਾ", "ਰੋਹਿਣੀ", "ਮ੍ਰਿਗਸ਼ਿਰਾ", "ਆਰਦਰਾ", "ਪੁਨਰਵਸੁ", "ਪੁਸ਼ਯਾ", "ਅਸ਼ਲੇਸ਼ਾ", "ਮਘા", "ਪੂਰਵਾ ਫਾਲਗੁਨੀ", "ਉੱਤਰਾ ਫਾਲਗੁਨੀ", "ਹਸਤ", "ਚਿਤ੍ਰਾ", "ਸਵਾਤੀ", "ਵਿਸ਼ਾਖਾ", "ਅਨੁਰਾਧਾ", "ਜਯੇਸ਼ਠਾ", "ਮੂਲਾ", "ਪੂਰਵਾਸ਼ਾੜਾ", "ਉੱਤਰਾਸ਼ਾੜਾ", "ਸ਼੍ਰਵਣ", "ਧਨਿਸ਼ਠਾ", "ਸ਼ਤਭਿਸ਼ਾ", "ਪੂਰਵਾ ਭਾਦਰਪਦ", "ਉੱਤਰਾ ਭਾਦਰਪਦ", "ਰੇਵਤੀ"],
+            'pa': ["ਅਸ਼ਵਿਨੀ", "ਭਰਣੀ", "ਕ੍ਰਿਤਿਕਾ", "ਰੋਹਿਣੀ", "ਮ੍ਰਿਗਸ਼ਿਰਾ", "ਆਰਦਰਾ", "ਪੁਨਰਵਸੁ", "ਪੁਸ਼ਯਾ", "ਅਸ਼ਲੇਸ਼ਾ", "ਮਘા", "ਪੂਰਵਾ ਫਾਲਗੁਨੀ", "ਉੱਤਰਾ ਫਾਲਗੁਨੀ", "ਹਸਤ", "ਚਿਤ੍ਰਾ", "ਸਵਾਤੀ", "ਵਿਸ਼ਾਖਾ", "ਅਨੁਰਾਧા", "ਜਯੇਸ਼ਠਾ", "ਮੂਲਾ", "ਪੂਰਵਾਸ਼ાੜਾ", "ਉੱਤਰਾਸ਼ਾੜਾ", "ਸ਼੍ਰਵਣ", "ਧਨਿਸ਼ਠਾ", "ਸ਼ਤਭਿਸ਼ਾ", "ਪੂਰਵਾ ਭਾਦਰਪਦ", "ਉੱਤਰਾ ਭਾਦਰਪਦ", "ਰੇਵਤੀ"],
             'en': ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Moola", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
         };
 
@@ -154,6 +157,46 @@ app.post('/monthly-calendar', async (req, res) => {
             'sd': ["چيٽ", "ويساک", "ڄيٺ", "آکاڙ", "ساوڻ", "بڊو", "اسو", "ڪتي", "ناھري", "پوھ", "مانگھ", "ڦڳڻ"],
             'en': ["Chaitra", "Vaishakha", "Jyeshtha", "Ashadha", "Shravana", "Bhadrapada", "Ashvin", "Kartika", "Margashirsha", "Pausha", "Magha", "Phalguna"]
         };
+
+        // 🌟 കലണ്ടർ തലക്കെട്ടുകൾ (എല്ലാ ഭാഷകൾക്കും) 🌟
+        const vikramSamvatDict = {
+            'ml': "വിക്രമ സംവത്",
+            'ta': "விக்ரம் சம்வத்",
+            'hi': "विक्रम संवत",
+            'te': "విక్రమ సంవత్సరం",
+            'kn': "ವಿಕ್ರಮ ಸಂವತ್",
+            'bn': "বিক্রম সংবৎ",
+            'mr': "विक्रम संवत",
+            'gu': "વિક્રમ સંવત",
+            'or': "ବିକ୍ରମ ସମ୍ବତ",
+            'as': "বিক্ৰম সংবৎ",
+            'pa': "ਵਿਕਰਮ ਸੰਵਤ",
+            'kok': "विक्रम संवत",
+            'ks': "विक्रम संवत",
+            'mni': "ꯕꯤꯀ꯭ꯔꯝ ꯁꯪꯕꯠ",
+            'ne': "विक्रम संवत्",
+            'sd': "وڪرم سموت",
+            'en': "Vikram Samvat"
+        };
+
+        const kollavarshamDict = {
+            'ml': "കൊല്ലവർഷം",
+            'hi': "कोल्लावर्षम",
+            'en': "Kollavarsham"
+        };
+
+        const sauramanamDict = {
+            'ml': "സൗരമാനം",
+            'ta': "சௌரமானம்",
+            'hi': "सौरमान",
+            'te': "సౌరమానం",
+            'kn': "ಸೌರಮಾನ",
+            'en': "Sauramanam"
+        };
+
+        let activeVikram = vikramSamvatDict[reqLang] || vikramSamvatDict['en'];
+        let activeKollam = kollavarshamDict[reqLang] || kollavarshamDict['en'];
+        let activeSaura = sauramanamDict[reqLang] || sauramanamDict['en'];
 
         let activeNakshatraList = nakshatrasDict[reqLang] || nakshatrasDict['en'];
         if (!nakshatrasDict[reqLang]) {
@@ -221,10 +264,11 @@ app.post('/monthly-calendar', async (req, res) => {
                 // 🌟 2. ഗുജറാത്തി കലണ്ടറിനുള്ള വർഷാരംഭം ഫിക്സ് 🌟
                 regionalYear = year + 57; 
                 if (tradition === 'gujarati' && lunarMonthIndex < 7) {
-                    regionalYear -= 1; // ഗുജറാത്തിൽ കാർത്തിക മാസത്തിന് (index 7) മുൻപുള്ള മാസങ്ങളിൽ പഴയ വർഷം കാണിക്കാൻ
+                    regionalYear -= 1; 
                 }
 
-                if (day === 15) regionalMonthDisplay = `വിക്രമ സംവത് ${regionalYear} - ${lunarMonthName}`;
+                // 🌟 3. വിക്രമ സംവത് ഭാഷകൾക്കനുസരിച്ച് നൽകുന്നു 🌟
+                if (day === 15) regionalMonthDisplay = `${activeVikram} ${regionalYear} - ${lunarMonthName}`;
 
                 regionalDates[dateStr] = `${lunarMonthName}\n${paksha} ${tithiDay}`; 
             } else {
@@ -232,7 +276,9 @@ app.post('/monthly-calendar', async (req, res) => {
                 let dayInSolarMonth = Math.floor(sunDeg % 30) + 1;
                 
                 regionalYear = (month > 8 || (month === 8 && day > 16)) ? year - 824 : year - 825;
-                if (day === 15) regionalMonthDisplay = `${tradition === 'kerala' ? 'കൊല്ലവർഷം' : 'സൗരമാനം'} ${regionalYear} - ${activeSolarList[sunRasi]}`;
+                
+                // 🌟 4. കൊല്ലവർഷം / സൗരമാനം ഭാഷകൾക്കനുസരിച്ച് നൽകുന്നു 🌟
+                if (day === 15) regionalMonthDisplay = `${tradition === 'kerala' ? activeKollam : activeSaura} ${regionalYear} - ${activeSolarList[sunRasi]}`;
 
                 regionalDates[dateStr] = `${activeSolarList[sunRasi]} ${dayInSolarMonth}`;
             }
