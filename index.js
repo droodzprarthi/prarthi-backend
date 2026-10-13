@@ -1104,22 +1104,17 @@ app.post('/calculate-numerology', async (req, res) => {
     }
 });
 
-// ==========================================
-// 10. Daily Horoscope
-// ==========================================
-// ==========================================
-// 10. Daily Horoscope (Dynamic AI via Cloudflare Worker + Premium Logic)
-// ==========================================
+// ==========================================================
+// 10. Daily Horoscope (Advanced Gemini AI via Cloudflare Worker)
+// ==========================================================
 app.post('/daily-horoscope', async (req, res) => {
     try {
         const body = req.body;
-        // ആപ്പിൽ നിന്ന് വരുന്ന ഭാഷ (lang) സ്വീകരിക്കുന്നു
         const { year, month, day, hour, min, lat, lon, lang } = body;
         const reqLang = lang || 'ml';
 
         const now = new Date();
-        const currentYear = now.getUTCFullYear(), currentMonth = now.getUTCMonth() + 1;
-        const currentDay = now.getUTCDate(), currentHour = now.getUTCHours() + (now.getUTCMinutes() / 60.0);
+        const todayDateStr = now.toISOString().split('T')[0];
 
         const eph = await load();
         let floatHour = hour + (min / 60.0) - 5.5;
@@ -1132,124 +1127,78 @@ app.post('/daily-horoscope', async (req, res) => {
             return (pos.xx[0] - ayanamsa + 360) % 360;
         };
 
-        // 1. ജനന സമയത്തെ ഗ്രഹങ്ങൾ
+        // കൃത്യമായ ജനന ഗണിതം എടുക്കുന്നു
         let natalMoonDeg = getPos(natalJd, Constants.SE_MOON, natalAyanamsa);
-        let natalSunDeg = getPos(natalJd, Constants.SE_SUN, natalAyanamsa);
         let natalNakshatra = Math.floor(natalMoonDeg / (360/27));
         let natalRasi = Math.floor(natalMoonDeg / 30) + 1;
-        let natalSunSign = Math.floor(natalSunDeg / 30) + 1; 
 
-        // 2. ഇന്നത്തെ (Transit) ഗ്രഹങ്ങൾ
-        const transitJd = eph.swe_julday(currentYear, currentMonth, currentDay, currentHour, Constants.SE_GREG_CAL);
-        const transitAyanamsa = eph.swe_get_ayanamsa_ut(transitJd);
+        const rasiNamesEn = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+        const nakshatraNamesEn = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Moola", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"];
         
-        let transitMoonDeg = getPos(transitJd, Constants.SE_MOON, transitAyanamsa);
-        let transitSunDeg = getPos(transitJd, Constants.SE_SUN, transitAyanamsa);
-        let transitJupDeg = getPos(transitJd, Constants.SE_JUPITER, transitAyanamsa);
+        const langMap = { 'ml': 'Malayalam', 'ta': 'Tamil', 'kn': 'Kannada', 'te': 'Telugu', 'hi': 'Hindi', 'en': 'English', 'bn': 'Bengali', 'pa': 'Punjabi', 'mr': 'Marathi', 'kok': 'Konkani', 'gu': 'Gujarati', 'as': 'Assamese', 'bho': 'Bhojpuri' };
+        const fullLangName = langMap[reqLang] || 'English';
 
-        let transitMoonRasi = Math.floor(transitMoonDeg / 30) + 1;
-        let transitSunRasi = Math.floor(transitSunDeg / 30) + 1;
-        let transitJupRasi = Math.floor(transitJupDeg / 30) + 1;
-        let transitNakshatra = Math.floor(transitMoonDeg / (360/27));
+        // 🌟 CALLING CLOUDFLARE WORKER FOR DETAILED AI PREDICTION 🌟
+        // AI വർക്ക് ചെയ്തില്ലെങ്കിൽ മാത്രം നൽകാനുള്ള ഡമ്മി Fallback ഡാറ്റ
+        let aiPrediction = {
+            general: "ഇന്ന് സമ്മിശ്ര ഫലങ്ങൾ നൽകുന്ന ദിവസമാണ്. ഈശ്വര പ്രാർത്ഥനകൾ വർദ്ധിപ്പിക്കുക. പ്രധാന തീരുമാനങ്ങൾ ശ്രദ്ധയോടെ എടുക്കുക.",
+            career: "തൊഴിൽ രംഗത്ത് മാറ്റങ്ങൾ പ്രതീക്ഷിക്കാം.",
+            business: "സാമ്പത്തിക ഇടപാടുകളിൽ ശ്രദ്ധിക്കുക.",
+            education: "പഠനകാര്യങ്ങളിൽ കൂടുതൽ ശ്രദ്ധ ആവശ്യമാണ്.",
+            romance: "കുടുംബത്തിൽ സമാധാനപരമായ അന്തരീക്ഷം.",
+            finance: "പണച്ചെലവുകൾ നിയന്ത്രിക്കുക.",
+            health: "ആരോഗ്യകാര്യങ്ങളിൽ ശ്രദ്ധിക്കുക.",
+            travel: "യാത്രകൾ അനുകൂലമാകും.",
+            lucky_color: "White",
+            lucky_number: "1",
+            remedy: "പ്രാർത്ഥനകൾ മുടക്കാതിരിക്കുക."
+        };
 
-        let tarabalam = ((transitNakshatra - natalNakshatra + 27) % 27) % 9 + 1;
-        let chandrabalam = (transitMoonRasi - natalRasi + 12) % 12 + 1;
-        let isGoodDay = [2, 4, 6, 8, 9].includes(tarabalam) && [1, 3, 6, 7, 10, 11].includes(chandrabalam);
-
-        // ==========================================
-        // 🌟 CALLING CLOUDFLARE WORKER FOR AI PREDICTION 🌟
-        // ==========================================
-        const rasiNames = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
-        const langMap = { 
-    'ml': 'Malayalam', 
-    'ta': 'Tamil', 
-    'kn': 'Kannada', 
-    'te': 'Telugu', 
-    'hi': 'Hindi', 
-    'en': 'English', 
-    'bn': 'Bengali', 
-    'pa': 'Punjabi', 
-    'mr': 'Marathi', 
-    'kok': 'Konkani', 
-    'gu': 'Gujarati', 
-    'as': 'Assamese', 
-    'bho': 'Bhojpuri' 
-};
-
-// ലിസ്റ്റിൽ ഇല്ലാത്ത ഭാഷ വന്നാൽ ഡീഫോൾട്ട് ആയി ഇംഗ്ലീഷ് വരുന്നതാണ് കൂടുതൽ നല്ലത്.
-const fullLangName = langMap[reqLang] || 'English';
-        const aiPrompt = `You are an expert Vedic Astrologer. Write a daily horoscope prediction for a person today.
-        - Their Birth Moon Sign (Rasi) is ${rasiNames[natalRasi - 1]}.
-        - Today's Transit Moon is in ${rasiNames[transitMoonRasi - 1]}.
-        - Today's Transit Sun is in ${rasiNames[transitSunRasi - 1]}.
-        - Today's Transit Jupiter is in ${rasiNames[transitJupRasi - 1]}.
-        Write a realistic daily prediction based on Vedic Gochara (Transit) astrology.
-        Write it beautifully in exactly 4-5 sentences.
-        Language MUST BE: ${fullLangName}. Do NOT use English translation, output strictly in ${fullLangName} script.`;
-
-        let aiPrediction = "";
         try {
-            // Render Dashboard-ൽ കൊടുത്ത URL എടുക്കുന്നു (ഇല്ലെങ്കിൽ നിങ്ങളുടെ വർക്കർ ലിങ്ക് കൊടുക്കുക)
-            const workerUrl = process.env.CLOUDFLARE_WORKER_URL || "https://your-worker-name.your-username.workers.dev/generate-ai-prediction"; 
+            // നിങ്ങളുടെ Cloudflare Worker URL നൽകുക
+            const workerUrl = process.env.CLOUDFLARE_WORKER_URL ? 
+                `${process.env.CLOUDFLARE_WORKER_URL}/generate-detailed-horoscope` : 
+                "https://your-worker-url.workers.dev/generate-detailed-horoscope"; 
             
             const aiResponse = await fetch(workerUrl, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    // Render Dashboard-ൽ കൊടുത്ത രഹസ്യ പാസ്‌വേഡ് എടുക്കുന്നു
-                    'x-api-secret': process.env.WORKER_SECRET_KEY 
-                },
-                body: JSON.stringify({ prompt: aiPrompt })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    rasi: rasiNamesEn[natalRasi - 1], 
+                    nakshatra: nakshatraNamesEn[natalNakshatra], 
+                    lang: fullLangName,
+                    date: todayDateStr
+                })
             });
             
             const aiResult = await aiResponse.json();
-            if (aiResult.success) {
-                aiPrediction = aiResult.prediction.trim();
-            } else {
-                throw new Error(aiResult.error || "Worker Error");
+            if (aiResult.success && aiResult.prediction) {
+                aiPrediction = aiResult.prediction; // യഥാർത്ഥ AI ഡാറ്റ റീപ്ലേസ് ചെയ്യുന്നു
             }
         } catch (err) {
-            console.error("AI Generation Error via Worker:", err);
-            aiPrediction = "ഇന്ന് സമ്മിശ്ര ഫലങ്ങൾ നൽകുന്ന ദിവസമാണ്. ഈശ്വര പ്രാർത്ഥനകൾ വർദ്ധിപ്പിക്കുക. പ്രധാന തീരുമാനങ്ങൾ ശ്രദ്ധയോടെ എടുക്കുക. കാര്യങ്ങൾ അനുകൂലമാകാൻ സാധ്യതയുണ്ട്.";
+            console.error("Detailed AI Generation Error via Worker:", err);
         }
 
-        // ==========================================
-        // 🌟 PREMIUM LOCK SPLITTING 🌟
-        // ==========================================
-        let sentences = aiPrediction.match(/[^.!?।]+[.!?।]+/g) || [aiPrediction];
-        let previewText = "";
-        let premiumText = "";
+        // ഫ്രീ യൂസർമാർക്കുള്ള ടീസർ നിർമ്മിക്കുന്നു
+        let sentences = aiPrediction.general.match(/[^.!?।]+[.!?।]+/g) || [aiPrediction.general];
+        let previewText = sentences.slice(0, 2).join(' ').trim();
 
-        if (sentences.length > 2) {
-            previewText = sentences.slice(0, 2).join(' ').trim();
-            premiumText = sentences.slice(2).join(' ').trim();
-        } else {
-            let halfLength = Math.floor(aiPrediction.length / 2);
-            previewText = aiPrediction.substring(0, halfLength) + "...";
-            premiumText = aiPrediction.substring(halfLength);
-        }
-
-        const ganas = ["deva", "manushya", "rakshasa"], nadis = ["adi", "madhya", "antya"], elements = ["fire", "earth", "air", "water", "ether"];
-        const animals = ["horse", "elephant", "sheep", "serpent", "serpent", "dog", "cat", "sheep", "cat", "rat", "rat", "cow", "buffalo", "tiger", "buffalo", "tiger", "deer", "deer", "dog", "monkey", "mongoose", "monkey", "lion", "horse", "lion", "cow", "elephant"];
-
-        const nakshatraData = {
-            nakshatra_index: natalNakshatra, rasi_index: natalRasi, sun_sign_index: natalSunSign,
-            tree_key: `tree_${natalNakshatra + 1}`, bird_key: `bird_${(natalNakshatra % 5) + 1}`, 
-            animal_key: `animal_${animals[natalNakshatra]}`, gana_key: `gana_${ganas[natalNakshatra % 3]}`,
-            nadi_key: `nadi_${nadis[natalNakshatra % 3]}`, element_key: `element_${elements[natalNakshatra % 5]}`
+        // രാശിയുടെ പേര് പ്രാദേശിക ഭാഷയിൽ
+        const rasiNamesLocal = {
+            'ml': ["മേടം", "ഇടവം", "മിഥുനം", "കർക്കടകം", "ചിങ്ങം", "കന്നി", "തുലാം", "വൃശ്ചികം", "ധനു", "മകരം", "കുംഭം", "മീനം"],
+            'en': rasiNamesEn
         };
+        const activeRasiList = rasiNamesLocal[reqLang] || rasiNamesLocal['ml'];
+        
+        const rasiIcons = ["♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐", "♑", "♒", "♓"];
 
         const responseData = { 
             success: true, 
-            natal_info: nakshatraData, 
             daily_transit: { 
-                transit_moon_rasi: transitMoonRasi, 
-                transit_nakshatra: transitNakshatra, 
-                tarabalam_index: tarabalam, 
-                chandrabalam_index: chandrabalam, 
-                is_auspicious_day: isGoodDay,
-                prediction_preview: previewText,    // ഫ്രീ ടെക്സ്റ്റ്
-                prediction_premium: premiumText     // പ്രീമിയം ടെക്സ്റ്റ്
+                rasi_name: activeRasiList[natalRasi - 1],
+                rasi_icon: rasiIcons[natalRasi - 1],
+                prediction_preview: previewText,    
+                prediction_premium: aiPrediction    
             } 
         };
         res.status(200).json(responseData);
